@@ -63,36 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        // If no profile exists, create one with default admin role
-        if (error.code === 'PGRST116') {
-          console.log('No user profile found, creating default admin profile...');
-          const { data: authUser } = await supabase.auth.getUser();
-          if (authUser.user) {
-            const { data: newProfile, error: createError } = await supabase
-              .from('user_profiles')
-              .insert([{
-                id: authUser.user.id,
-                email: authUser.user.email || '',
-                full_name: authUser.user.email?.split('@')[0] || 'Admin User',
-                role: 'admin'
-              }])
-              .select()
-              .single();
-
-            if (createError) {
-              console.error('Error creating user profile:', createError);
-              throw createError;
-            }
-            
-            setUser(newProfile);
-            toast.success('Welcome! Admin profile created successfully.');
-          }
-        } else {
-          throw error;
-        }
-      } else {
-        setUser(data);
+        console.error('Error fetching user profile:', error);
+        throw error;
       }
+
+      setUser(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
       toast.error('Error loading user profile');
@@ -110,7 +85,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Sign in error:', error);
-        toast.error(error.message);
         throw error;
       }
 
@@ -131,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        toast.error(error.message);
+        console.error('Sign up error:', error);
         throw error;
       }
 
@@ -148,7 +122,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
-          toast.error('Error creating user profile');
           throw profileError;
         }
 
@@ -164,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        toast.error(error.message);
+        console.error('Sign out error:', error);
         throw error;
       }
       toast.success('Signed out successfully!');

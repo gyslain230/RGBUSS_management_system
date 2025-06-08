@@ -1,53 +1,59 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Store, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
-export default function LoginForm() {
+export default function RegisterForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<'admin' | 'manager' | 'worker'>('admin');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!email || !password || !confirmPassword || !fullName) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
       return;
     }
 
     setLoading(true);
     try {
-      await signIn(email, password);
-      navigate(from, { replace: true });
-    } catch (error: any) {
-      console.error('Login error:', error);
-      
-      // Provide more helpful error messages
-      if (error?.message?.includes('Invalid login credentials')) {
-        toast.error('Invalid email or password. Please check your credentials and try again.');
-      } else if (error?.message?.includes('Email not confirmed')) {
-        toast.error('Please check your email and confirm your account before signing in.');
-      } else {
-        toast.error('Login failed. Please try again.');
-      }
+      await signUp(email, password, fullName, role);
+      toast.success('Account created successfully! You can now sign in.');
+      navigate('/login');
+    } catch (error) {
+      console.error('Registration error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Quick admin login for testing
-  const handleQuickAdminLogin = () => {
+  // Quick admin setup for testing
+  const handleQuickAdminSetup = () => {
     setEmail('admin@rgbuss.com');
     setPassword('admin123');
+    setConfirmPassword('admin123');
+    setFullName('System Administrator');
+    setRole('admin');
   };
 
   return (
@@ -61,39 +67,29 @@ export default function LoginForm() {
             </div>
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            Sign in to your account
+            Create your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Business Management System
+            Set up your business management system
           </p>
         </div>
-
-        {/* Info banner for first-time users */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                First time here?
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>
-                  If you don't have an account yet, you'll need to{' '}
-                  <Link
-                    to="/register"
-                    className="font-medium underline hover:text-blue-600"
-                  >
-                    create one first
-                  </Link>
-                  . Use the "Quick Admin Setup" on the registration page to get started quickly.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div>
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                Full Name
+              </label>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Enter your full name"
+              />
+            </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -111,6 +107,22 @@ export default function LoginForm() {
               />
             </div>
             <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                Role
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'admin' | 'manager' | 'worker')}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+              >
+                <option value="admin">Administrator</option>
+                <option value="manager">Manager</option>
+                <option value="worker">Worker</option>
+              </select>
+            </div>
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
@@ -119,7 +131,7 @@ export default function LoginForm() {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -139,6 +151,35 @@ export default function LoginForm() {
                 </button>
               </div>
             </div>
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                Confirm Password
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  placeholder="Confirm your password"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -147,36 +188,34 @@ export default function LoginForm() {
               disabled={loading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
             >
+              <UserPlus className="h-5 w-5 mr-2" />
               {loading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                'Sign in'
+                'Create Account'
               )}
             </button>
           </div>
 
-          {/* Quick Admin Login for Testing */}
+          {/* Quick Admin Setup for Testing */}
           <div className="text-center">
             <button
               type="button"
-              onClick={handleQuickAdminLogin}
+              onClick={handleQuickAdminSetup}
               className="text-sm text-blue-600 hover:text-blue-500 transition-colors duration-200"
             >
-              Quick Admin Login (for testing)
+              Quick Admin Setup (for testing)
             </button>
-            <p className="text-xs text-gray-500 mt-1">
-              Note: Admin account must be created first
-            </p>
           </div>
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              Already have an account?{' '}
               <Link
-                to="/register"
+                to="/login"
                 className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
               >
-                Create one here
+                Sign in here
               </Link>
             </p>
           </div>
