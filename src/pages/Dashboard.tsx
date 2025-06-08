@@ -67,13 +67,37 @@ export default function Dashboard() {
   const [downloadingReport, setDownloadingReport] = useState(false);
 
   useEffect(() => {
-    if (user && (user.role === 'admin' || user.role === 'manager')) {
-      fetchDashboardData();
+    console.log('Dashboard useEffect triggered, user:', user);
+    if (user) {
+      console.log('User role:', user.role);
+      if (user.role === 'admin' || user.role === 'manager') {
+        console.log('User has dashboard access, fetching data...');
+        fetchDashboardData();
+      } else {
+        console.log('User does not have dashboard access');
+        setLoading(false);
+      }
+    } else {
+      console.log('No user found');
+      setLoading(false);
     }
   }, [user]);
 
   // Check if user has dashboard access
-  if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+  if (!user) {
+    console.log('No user - showing loading');
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user.role !== 'admin' && user.role !== 'manager') {
+    console.log('User does not have access - showing access denied');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -91,11 +115,13 @@ export default function Dashboard() {
   }
 
   const fetchDashboardData = async () => {
+    console.log('Starting to fetch dashboard data...');
     try {
       const today = new Date();
       const todayStart = startOfDay(today).toISOString();
       const todayEnd = endOfDay(today).toISOString();
 
+      console.log('Fetching today\'s sales...');
       // Fetch today's sales data
       const { data: todaySales, error: salesError } = await supabase
         .from('sales')
@@ -103,56 +129,93 @@ export default function Dashboard() {
         .gte('created_at', todayStart)
         .lte('created_at', todayEnd);
 
-      if (salesError) throw salesError;
+      if (salesError) {
+        console.error('Sales error:', salesError);
+        throw salesError;
+      }
+
+      console.log('Today\'s sales:', todaySales);
 
       const revenueToday = todaySales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
       const salesToday = todaySales?.reduce((sum, sale) => sum + sale.quantity_sold, 0) || 0;
 
+      console.log('Revenue today:', revenueToday, 'Sales today:', salesToday);
+
       // Fetch total revenue
+      console.log('Fetching all sales...');
       const { data: allSales, error: allSalesError } = await supabase
         .from('sales')
         .select('total_amount, created_at');
 
-      if (allSalesError) throw allSalesError;
+      if (allSalesError) {
+        console.error('All sales error:', allSalesError);
+        throw allSalesError;
+      }
+
+      console.log('All sales:', allSales);
 
       const totalRevenue = allSales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
 
       // Fetch products in stock
+      console.log('Fetching products...');
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('quantity, category, name, id')
         .eq('status', 'approved');
 
-      if (productsError) throw productsError;
+      if (productsError) {
+        console.error('Products error:', productsError);
+        throw productsError;
+      }
+
+      console.log('Products:', products);
 
       const productsInStock = products?.reduce((sum, product) => sum + product.quantity, 0) || 0;
 
       // Fetch recent sales (last 10)
+      console.log('Fetching recent sales...');
       const { data: recentSales, error: recentSalesError } = await supabase
         .from('sales')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (recentSalesError) throw recentSalesError;
+      if (recentSalesError) {
+        console.error('Recent sales error:', recentSalesError);
+        throw recentSalesError;
+      }
+
+      console.log('Recent sales:', recentSales);
 
       // Fetch stock alerts (products with quantity < 5)
+      console.log('Fetching stock alerts...');
       const { data: stockAlerts, error: stockAlertsError } = await supabase
         .from('products')
         .select('*')
         .lt('quantity', 5)
         .eq('status', 'approved');
 
-      if (stockAlertsError) throw stockAlertsError;
+      if (stockAlertsError) {
+        console.error('Stock alerts error:', stockAlertsError);
+        throw stockAlertsError;
+      }
+
+      console.log('Stock alerts:', stockAlerts);
 
       // Fetch today's credit alerts
+      console.log('Fetching credit alerts...');
       const { data: creditAlerts, error: creditAlertsError } = await supabase
         .from('credits')
         .select('*')
         .gte('created_at', todayStart)
         .lte('created_at', todayEnd);
 
-      if (creditAlertsError) throw creditAlertsError;
+      if (creditAlertsError) {
+        console.error('Credit alerts error:', creditAlertsError);
+        throw creditAlertsError;
+      }
+
+      console.log('Credit alerts:', creditAlerts);
 
       // Generate sales overview for last 7 days
       const salesOverview = [];
@@ -175,6 +238,8 @@ export default function Dashboard() {
         });
       }
 
+      console.log('Sales overview:', salesOverview);
+
       // Generate category breakdown
       const categoryMap = new Map();
       products?.forEach(product => {
@@ -192,6 +257,8 @@ export default function Dashboard() {
         color: `hsl(${Math.random() * 360}, 70%, 50%)`
       }));
 
+      console.log('Category breakdown:', categoryBreakdown);
+
       // Generate mock previous reports
       const previousReports = Array.from({ length: 30 }, (_, i) => {
         const date = subDays(today, i + 1);
@@ -204,7 +271,7 @@ export default function Dashboard() {
         };
       });
 
-      setData({
+      const dashboardData = {
         revenueToday,
         salesToday,
         productsInStock,
@@ -215,11 +282,15 @@ export default function Dashboard() {
         creditAlerts: creditAlerts || [],
         categoryBreakdown,
         previousReports
-      });
+      };
+
+      console.log('Final dashboard data:', dashboardData);
+      setData(dashboardData);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Error loading dashboard data');
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
@@ -284,7 +355,10 @@ export default function Dashboard() {
     }
   };
 
+  console.log('Rendering dashboard, loading:', loading, 'user:', user);
+
   if (loading) {
+    console.log('Showing loading screen');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -294,6 +368,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  console.log('Rendering main dashboard content');
 
   return (
     <div className="space-y-6">
