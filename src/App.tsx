@@ -44,14 +44,14 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginForm />} />
             <Route path="/register" element={<RegisterForm />} />
-            <Route path="/" element={<Navigate to="/dashboard\" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               path="/*"
               element={
                 <ProtectedRoute>
                   <Layout>
                     <Routes>
-                      <Route path="/dashboard\" element={<Dashboard />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/stock" element={<StockManagement />} />
                       <Route path="/sales" element={<SalesManagement />} />
                       <Route path="/users" element={<UserManagement />} />
