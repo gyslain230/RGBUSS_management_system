@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase, User } from '../lib/supabase';
 import toast from 'react-hot-toast';
+
+interface User {
+  id: string;
+  email: string;
+  role: 'admin' | 'manager' | 'worker';
+  full_name: string;
+  created_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  supabaseUser: SupabaseUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
@@ -22,94 +27,90 @@ export function useAuth() {
   return context;
 }
 
+// Default test users for easy testing
+const DEFAULT_USERS = [
+  {
+    id: '1',
+    email: 'admin@test.com',
+    password: 'admin123',
+    full_name: 'Admin User',
+    role: 'admin' as const,
+    created_at: new Date().toISOString()
+  },
+  {
+    id: '2',
+    email: 'manager@test.com',
+    password: 'manager123',
+    full_name: 'Manager User',
+    role: 'manager' as const,
+    created_at: new Date().toISOString()
+  },
+  {
+    id: '3',
+    email: 'worker@test.com',
+    password: 'worker123',
+    full_name: 'Worker User',
+    role: 'worker' as const,
+    created_at: new Date().toISOString()
+  }
+];
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      setSupabaseUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session);
-        setSupabaseUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchUserProfile(session.user.id);
-        } else {
-          setUser(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      console.log('Fetching user profile for:', userId);
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        throw error;
-      }
-
-      console.log('User profile fetched:', data);
-      setUser(data);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      toast.error('Error loading user profile');
-    } finally {
-      setLoading(false);
+    // Initialize default users in localStorage if they don't exist
+    const existingUsers = localStorage.getItem('users');
+    if (!existingUsers) {
+      localStorage.setItem('users', JSON.stringify(DEFAULT_USERS));
     }
-  };
+
+    // Check for existing session
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+      try {
+        setUser(JSON.parse(currentUser));
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('currentUser');
+      }
+    }
+    setLoading(false);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
       console.log('Attempting to sign in with:', email);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-
-      if (error) {
-        console.error('Supabase auth error:', error);
-        
-        // Provide specific error messages based on error codes
-        if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
-          throw new Error('Invalid email or password. Please check your credentials and try again.');
-        } else if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please check your email and confirm your account before signing in.');
-        } else if (error.message.includes('Too many requests')) {
-          throw new Error('Too many login attempts. Please wait a moment and try again.');
-        } else if (error.message.includes('User not found')) {
-          throw new Error('No account found with this email address. Please check your email or create an account.');
-        } else {
-          throw new Error(error.message || 'Login failed. Please try again.');
-        }
+      // Get users from localStorage
+      const usersData = localStorage.getItem('users');
+      if (!usersData) {
+        throw new Error('No users found. Please create an account first.');
       }
 
-      if (data.user) {
-        console.log('Successfully signed in:', data.user.email);
-        toast.success('Signed in successfully!');
+      const users = JSON.parse(usersData);
+      const foundUser = users.find((u: any) => u.email === email && u.password === password);
+
+      if (!foundUser) {
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
       }
+
+      // Create user object without password
+      const userWithoutPassword = {
+        id: foundUser.id,
+        email: foundUser.email,
+        full_name: foundUser.full_name,
+        role: foundUser.role,
+        created_at: foundUser.created_at
+      };
+
+      // Store current user
+      localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
+      setUser(userWithoutPassword);
+
+      console.log('Successfully signed in:', foundUser.email);
+      toast.success('Signed in successfully!');
     } catch (error: any) {
       console.error('Sign in failed:', error);
       toast.error(error.message || 'Login failed. Please try again.');
@@ -121,52 +122,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Attempting to sign up with:', email, role);
       
-      const { data, error } = await supabase.auth.signUp({
+      // Get existing users
+      const usersData = localStorage.getItem('users') || '[]';
+      const users = JSON.parse(usersData);
+
+      // Check if user already exists
+      const existingUser = users.find((u: any) => u.email === email);
+      if (existingUser) {
+        throw new Error('An account with this email already exists. Please sign in instead.');
+      }
+
+      // Create new user
+      const newUser = {
+        id: Date.now().toString(),
         email: email,
         password: password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: role,
-          }
-        }
-      });
+        full_name: fullName,
+        role: role as 'admin' | 'manager' | 'worker',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) {
-        console.error('Supabase signup error:', error);
-        
-        if (error.message.includes('User already registered')) {
-          throw new Error('An account with this email already exists. Please sign in instead.');
-        } else if (error.message.includes('Password should be at least')) {
-          throw new Error('Password must be at least 6 characters long.');
-        } else if (error.message.includes('Invalid email')) {
-          throw new Error('Please enter a valid email address.');
-        } else {
-          throw new Error(error.message || 'Registration failed. Please try again.');
-        }
-      }
+      // Add to users array
+      users.push(newUser);
+      localStorage.setItem('users', JSON.stringify(users));
 
-      if (data.user) {
-        console.log('User created in auth:', data.user.id);
-        
-        // Create user profile in our custom table
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert([{
-            id: data.user.id,
-            email: email,
-            full_name: fullName,
-            role: role as 'admin' | 'manager' | 'worker',
-          }]);
-
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          throw new Error('Account created but profile setup failed. Please contact support.');
-        }
-
-        console.log('User profile created successfully');
-        toast.success('Account created successfully! You can now sign in.');
-      }
+      console.log('User created successfully');
+      toast.success('Account created successfully! You can now sign in.');
     } catch (error: any) {
       console.error('Sign up failed:', error);
       toast.error(error.message || 'Registration failed. Please try again.');
@@ -177,11 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       console.log('Signing out...');
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Sign out error:', error);
-        throw error;
-      }
+      localStorage.removeItem('currentUser');
+      setUser(null);
       console.log('Successfully signed out');
       toast.success('Signed out successfully!');
     } catch (error: any) {
@@ -193,7 +171,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    supabaseUser,
     loading,
     signIn,
     signUp,

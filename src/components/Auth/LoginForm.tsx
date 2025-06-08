@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, AlertCircle, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Store, AlertCircle, UserPlus, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -46,6 +46,11 @@ export default function LoginForm() {
     }
   };
 
+  const handleTestLogin = (testEmail: string, testPassword: string) => {
+    setEmail(testEmail);
+    setPassword(testPassword);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -64,21 +69,61 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {/* First Time Setup Notice */}
+        {/* Test Credentials Notice */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
             <div className="ml-3">
               <h3 className="text-sm font-medium text-blue-800">
+                Test Credentials Available
+              </h3>
+              <div className="mt-2 text-sm text-blue-700 space-y-2">
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestLogin('admin@test.com', 'admin123')}
+                    className="text-left p-2 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    <div className="font-medium">Admin Account</div>
+                    <div className="text-xs">admin@test.com / admin123</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTestLogin('manager@test.com', 'manager123')}
+                    className="text-left p-2 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    <div className="font-medium">Manager Account</div>
+                    <div className="text-xs">manager@test.com / manager123</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTestLogin('worker@test.com', 'worker123')}
+                    className="text-left p-2 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    <div className="font-medium">Worker Account</div>
+                    <div className="text-xs">worker@test.com / worker123</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* First Time Setup Notice */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-green-400 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">
                 New to RGBUSS?
               </h3>
-              <div className="mt-2 text-sm text-blue-700">
+              <div className="mt-2 text-sm text-green-700">
                 <p>
-                  If you don't have an account yet, you'll need to create one first.
+                  If you don't have an account yet, you can create one or use the test credentials above.
                   {' '}
                   <Link
                     to="/register"
-                    className="font-medium underline hover:text-blue-600 inline-flex items-center"
+                    className="font-medium underline hover:text-green-600 inline-flex items-center"
                   >
                     <UserPlus className="h-4 w-4 mr-1" />
                     Create Account
