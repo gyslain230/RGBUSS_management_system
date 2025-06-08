@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
       setSupabaseUser(session?.user ?? null);
       if (session?.user) {
         fetchUserProfile(session.user.id);
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session);
         setSupabaseUser(session?.user ?? null);
         if (session?.user) {
           await fetchUserProfile(session.user.id);
@@ -56,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching user profile for:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -67,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
+      console.log('User profile fetched:', data);
       setUser(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -78,39 +82,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting to sign in with:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (error) {
-        console.error('Sign in error:', error);
-        throw error;
+        console.error('Supabase auth error:', error);
+        
+        // Provide specific error messages based on error codes
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials.');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please check your email and confirm your account.');
+        } else if (error.message.includes('Too many requests')) {
+          throw new Error('Too many login attempts. Please wait a moment and try again.');
+        } else {
+          throw new Error(error.message || 'Login failed. Please try again.');
+        }
       }
 
       if (data.user) {
+        console.log('Successfully signed in:', data.user.email);
         toast.success('Signed in successfully!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign in failed:', error);
+      toast.error(error.message || 'Login failed. Please try again.');
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
     try {
+      console.log('Attempting to sign up with:', email, role);
+      
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: role,
+          }
+        }
       });
 
       if (error) {
-        console.error('Sign up error:', error);
-        throw error;
+        console.error('Supabase signup error:', error);
+        throw new Error(error.message || 'Registration failed. Please try again.');
       }
 
       if (data.user) {
-        // Create user profile
+        console.log('User created in auth:', data.user.id);
+        
+        // Create user profile in our custom table
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert([{
@@ -122,27 +150,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
-          throw profileError;
+          throw new Error('Account created but profile setup failed. Please contact support.');
         }
 
-        toast.success('Account created successfully!');
+        console.log('User profile created successfully');
+        toast.success('Account created successfully! You can now sign in.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign up failed:', error);
+      toast.error(error.message || 'Registration failed. Please try again.');
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
+      console.log('Signing out...');
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Sign out error:', error);
         throw error;
       }
+      console.log('Successfully signed out');
       toast.success('Signed out successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign out failed:', error);
+      toast.error(error.message || 'Sign out failed. Please try again.');
       throw error;
     }
   };

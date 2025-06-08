@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Store, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -29,16 +29,8 @@ export default function LoginForm() {
       await signIn(email, password);
       navigate(from, { replace: true });
     } catch (error: any) {
+      // Error handling is done in AuthContext with specific messages
       console.error('Login error:', error);
-      
-      // Provide more helpful error messages
-      if (error?.message?.includes('Invalid login credentials')) {
-        toast.error('Invalid email or password. Please check your credentials and try again.');
-      } else if (error?.message?.includes('Email not confirmed')) {
-        toast.error('Please check your email and confirm your account before signing in.');
-      } else {
-        toast.error('Login failed. Please try again.');
-      }
     } finally {
       setLoading(false);
     }
@@ -68,24 +60,25 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {/* Info banner for first-time users */}
+        {/* Authentication Status Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-blue-400 mt-0.5" />
             <div className="ml-3">
               <h3 className="text-sm font-medium text-blue-800">
-                First time here?
+                Supabase Authentication Active
               </h3>
               <div className="mt-2 text-sm text-blue-700">
                 <p>
-                  If you don't have an account yet, you'll need to{' '}
+                  This system uses Supabase Auth for secure user authentication.
+                  {' '}
                   <Link
                     to="/register"
                     className="font-medium underline hover:text-blue-600"
                   >
-                    create one first
+                    Create an account
                   </Link>
-                  . Use the "Quick Admin Setup\" on the registration page to get started quickly.
+                  {' '}if you don't have one yet.
                 </p>
               </div>
             </div>
@@ -165,7 +158,7 @@ export default function LoginForm() {
               Quick Admin Login (for testing)
             </button>
             <p className="text-xs text-gray-500 mt-1">
-              Note: Admin account must be created first
+              Note: Admin account must be created first via registration
             </p>
           </div>
 
