@@ -12,6 +12,9 @@ export default function CreditPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all');
 
+  // Check if user can mark credits as paid (only managers and admins)
+  const canMarkAsPaid = user?.role === 'admin' || user?.role === 'manager';
+
   useEffect(() => {
     fetchCredits();
   }, [user]);
@@ -46,6 +49,12 @@ export default function CreditPanel() {
   };
 
   const handleMarkAsPaid = async (creditId: string) => {
+    // Double-check permissions before allowing action
+    if (!canMarkAsPaid) {
+      toast.error('You do not have permission to mark credits as paid');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('credits')
@@ -88,7 +97,12 @@ export default function CreditPanel() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Credit Panel</h1>
-        <p className="text-gray-600">Monitor and manage credit sales</p>
+        <p className="text-gray-600">
+          Monitor and manage credit sales
+          {user?.role === 'worker' && (
+            <span className="text-orange-600 ml-2">(View Only - Contact manager to mark payments)</span>
+          )}
+        </p>
       </div>
 
       {/* Summary Cards */}
@@ -129,6 +143,26 @@ export default function CreditPanel() {
           </div>
         </div>
       </div>
+
+      {/* Permission Notice for Workers */}
+      {user?.role === 'worker' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">
+                Limited Access
+              </h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <p>
+                  As a worker, you can view credit sales but cannot mark them as paid. 
+                  Please contact your manager or administrator to process payments.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -231,13 +265,17 @@ export default function CreditPanel() {
                       {format(new Date(credit.created_at), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {credit.status === 'pending' || credit.status === 'overdue' ? (
+                      {(credit.status === 'pending' || credit.status === 'overdue') && canMarkAsPaid ? (
                         <button
                           onClick={() => handleMarkAsPaid(credit.id)}
-                          className="text-green-600 hover:text-green-900 text-sm font-medium"
+                          className="text-green-600 hover:text-green-900 text-sm font-medium transition-colors"
                         >
                           Mark as Paid
                         </button>
+                      ) : (credit.status === 'pending' || credit.status === 'overdue') && !canMarkAsPaid ? (
+                        <span className="text-gray-400 text-sm" title="Contact manager to mark as paid">
+                          Manager Only
+                        </span>
                       ) : (
                         <span className="text-gray-400 text-sm">-</span>
                       )}
