@@ -42,25 +42,56 @@ function App() {
             }}
           />
           <Routes>
+            {/* Public Routes */}
             <Route path="/login" element={<LoginForm />} />
             <Route path="/register" element={<RegisterForm />} />
-            <Route path="/" element={<Navigate to="/dashboard\" replace />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Routes>
-                      <Route path="/dashboard\" element={<Dashboard />} />
-                      <Route path="/stock" element={<StockManagement />} />
-                      <Route path="/sales" element={<SalesManagement />} />
-                      <Route path="/users" element={<UserManagement />} />
-                      <Route path="/credits" element={<CreditPanel />} />
-                    </Routes>
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
+            
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/stock" element={
+              <ProtectedRoute>
+                <Layout>
+                  <StockManagement />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/sales" element={
+              <ProtectedRoute>
+                <Layout>
+                  <SalesManagement />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <Layout>
+                  <UserManagement />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/credits" element={
+              <ProtectedRoute>
+                <Layout>
+                  <CreditPanel />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            {/* Default redirect */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Catch all route */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </Router>

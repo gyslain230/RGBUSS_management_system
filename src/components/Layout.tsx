@@ -1,11 +1,16 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
-export default function Layout({ children }: { children?: React.ReactNode }) {
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
   const { user, loading } = useAuth();
+
+  console.log('Layout: Rendering with user:', user, 'loading:', loading);
 
   if (loading) {
     return (
@@ -19,6 +24,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
   }
 
   if (!user) {
+    console.log('Layout: No user found, should redirect to login');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -28,13 +34,15 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
     );
   }
 
+  console.log('Layout: Rendering layout for user:', user.email, 'role:', user.role);
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
-          {children || <Outlet />}
+          {children}
         </main>
       </div>
     </div>
