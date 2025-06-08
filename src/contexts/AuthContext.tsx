@@ -60,28 +60,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('AuthProvider: Initializing...');
+    
     // Initialize default users in localStorage if they don't exist
     const existingUsers = localStorage.getItem('users');
     if (!existingUsers) {
+      console.log('AuthProvider: Creating default users');
       localStorage.setItem('users', JSON.stringify(DEFAULT_USERS));
     }
 
     // Check for existing session
     const currentUser = localStorage.getItem('currentUser');
+    console.log('AuthProvider: Checking for existing session:', currentUser);
+    
     if (currentUser) {
       try {
-        setUser(JSON.parse(currentUser));
+        const parsedUser = JSON.parse(currentUser);
+        console.log('AuthProvider: Found existing user:', parsedUser);
+        setUser(parsedUser);
       } catch (error) {
-        console.error('Error parsing stored user:', error);
+        console.error('AuthProvider: Error parsing stored user:', error);
         localStorage.removeItem('currentUser');
       }
     }
+    
     setLoading(false);
+    console.log('AuthProvider: Initialization complete');
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting to sign in with:', email);
+      console.log('AuthProvider: Attempting to sign in with:', email);
       
       // Get users from localStorage
       const usersData = localStorage.getItem('users');
@@ -90,11 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const users = JSON.parse(usersData);
+      console.log('AuthProvider: Available users:', users.map((u: any) => ({ email: u.email, role: u.role })));
+      
       const foundUser = users.find((u: any) => u.email === email && u.password === password);
 
       if (!foundUser) {
         throw new Error('Invalid email or password. Please check your credentials and try again.');
       }
+
+      console.log('AuthProvider: User found:', foundUser);
 
       // Create user object without password
       const userWithoutPassword = {
@@ -105,14 +118,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         created_at: foundUser.created_at
       };
 
+      console.log('AuthProvider: Setting user:', userWithoutPassword);
+
       // Store current user
       localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
       setUser(userWithoutPassword);
 
-      console.log('Successfully signed in:', foundUser.email);
-      toast.success('Signed in successfully!');
+      console.log('AuthProvider: Successfully signed in:', foundUser.email, 'Role:', foundUser.role);
+      toast.success(`Signed in successfully as ${foundUser.role}!`);
     } catch (error: any) {
-      console.error('Sign in failed:', error);
+      console.error('AuthProvider: Sign in failed:', error);
       toast.error(error.message || 'Login failed. Please try again.');
       throw error;
     }
@@ -120,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
     try {
-      console.log('Attempting to sign up with:', email, role);
+      console.log('AuthProvider: Attempting to sign up with:', email, role);
       
       // Get existing users
       const usersData = localStorage.getItem('users') || '[]';
@@ -146,10 +161,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       users.push(newUser);
       localStorage.setItem('users', JSON.stringify(users));
 
-      console.log('User created successfully');
+      console.log('AuthProvider: User created successfully');
       toast.success('Account created successfully! You can now sign in.');
     } catch (error: any) {
-      console.error('Sign up failed:', error);
+      console.error('AuthProvider: Sign up failed:', error);
       toast.error(error.message || 'Registration failed. Please try again.');
       throw error;
     }
@@ -157,13 +172,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      console.log('Signing out...');
+      console.log('AuthProvider: Signing out...');
       localStorage.removeItem('currentUser');
       setUser(null);
-      console.log('Successfully signed out');
+      console.log('AuthProvider: Successfully signed out');
       toast.success('Signed out successfully!');
     } catch (error: any) {
-      console.error('Sign out failed:', error);
+      console.error('AuthProvider: Sign out failed:', error);
       toast.error(error.message || 'Sign out failed. Please try again.');
       throw error;
     }
@@ -176,6 +191,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
   };
+
+  console.log('AuthProvider: Current state - User:', user, 'Loading:', loading);
 
   return (
     <AuthContext.Provider value={value}>
