@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, AlertCircle, CheckCircle, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Store, AlertCircle, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -24,9 +24,19 @@ export default function LoginForm() {
       return;
     }
 
+    if (!email.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password);
       navigate(from, { replace: true });
     } catch (error: any) {
       // Error handling is done in AuthContext with specific messages
@@ -34,12 +44,6 @@ export default function LoginForm() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Quick admin login for testing
-  const handleQuickAdminLogin = () => {
-    setEmail('admin@rgbuss.com');
-    setPassword('admin123');
   };
 
   return (
@@ -61,42 +65,24 @@ export default function LoginForm() {
         </div>
 
         {/* First Time Setup Notice */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-amber-400 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-amber-800">
-                First Time Setup Required
-              </h3>
-              <div className="mt-2 text-sm text-amber-700">
-                <p>
-                  If this is your first time using the system, you need to create an account first.
-                  {' '}
-                  <Link
-                    to="/register"
-                    className="font-medium underline hover:text-amber-600 inline-flex items-center"
-                  >
-                    <UserPlus className="h-4 w-4 mr-1" />
-                    Create Admin Account
-                  </Link>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Authentication Status Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex">
-            <CheckCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
             <div className="ml-3">
               <h3 className="text-sm font-medium text-blue-800">
-                Supabase Authentication Active
+                New to RGBUSS?
               </h3>
               <div className="mt-2 text-sm text-blue-700">
                 <p>
-                  This system uses Supabase Auth for secure user authentication.
-                  Only registered users can access the system.
+                  If you don't have an account yet, you'll need to create one first.
+                  {' '}
+                  <Link
+                    to="/register"
+                    className="font-medium underline hover:text-blue-600 inline-flex items-center"
+                  >
+                    <UserPlus className="h-4 w-4 mr-1" />
+                    Create Account
+                  </Link>
                 </p>
               </div>
             </div>
@@ -164,20 +150,6 @@ export default function LoginForm() {
                 'Sign in'
               )}
             </button>
-          </div>
-
-          {/* Quick Admin Login for Testing */}
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={handleQuickAdminLogin}
-              className="text-sm text-blue-600 hover:text-blue-500 transition-colors duration-200"
-            >
-              Quick Admin Login (for testing)
-            </button>
-            <p className="text-xs text-gray-500 mt-1">
-              Note: Admin account must be created first via registration
-            </p>
           </div>
 
           <div className="text-center">

@@ -85,20 +85,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Attempting to sign in with:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+        email: email,
+        password: password,
       });
 
       if (error) {
         console.error('Supabase auth error:', error);
         
         // Provide specific error messages based on error codes
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password. Please check your credentials.');
+        if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
         } else if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please check your email and confirm your account.');
+          throw new Error('Please check your email and confirm your account before signing in.');
         } else if (error.message.includes('Too many requests')) {
           throw new Error('Too many login attempts. Please wait a moment and try again.');
+        } else if (error.message.includes('User not found')) {
+          throw new Error('No account found with this email address. Please check your email or create an account.');
         } else {
           throw new Error(error.message || 'Login failed. Please try again.');
         }
@@ -120,8 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Attempting to sign up with:', email, role);
       
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
+        email: email,
+        password: password,
         options: {
           data: {
             full_name: fullName,
@@ -132,7 +134,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Supabase signup error:', error);
-        throw new Error(error.message || 'Registration failed. Please try again.');
+        
+        if (error.message.includes('User already registered')) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
+        } else if (error.message.includes('Password should be at least')) {
+          throw new Error('Password must be at least 6 characters long.');
+        } else if (error.message.includes('Invalid email')) {
+          throw new Error('Please enter a valid email address.');
+        } else {
+          throw new Error(error.message || 'Registration failed. Please try again.');
+        }
       }
 
       if (data.user) {
@@ -143,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from('user_profiles')
           .insert([{
             id: data.user.id,
-            email: email.trim(),
+            email: email,
             full_name: fullName,
             role: role as 'admin' | 'manager' | 'worker',
           }]);

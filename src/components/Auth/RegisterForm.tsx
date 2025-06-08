@@ -25,6 +25,11 @@ export default function RegisterForm() {
       return;
     }
 
+    if (!email.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -37,7 +42,7 @@ export default function RegisterForm() {
 
     setLoading(true);
     try {
-      await signUp(email, password, fullName, role);
+      await signUp(email.trim(), password, fullName.trim(), role);
       toast.success('Account created successfully! You can now sign in.');
       navigate('/login');
     } catch (error) {
@@ -45,15 +50,6 @@ export default function RegisterForm() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Quick admin setup for testing
-  const handleQuickAdminSetup = () => {
-    setEmail('admin@rgbuss.com');
-    setPassword('admin123');
-    setConfirmPassword('admin123');
-    setFullName('System Administrator');
-    setRole('admin');
   };
 
   return (
@@ -194,17 +190,6 @@ export default function RegisterForm() {
               ) : (
                 'Create Account'
               )}
-            </button>
-          </div>
-
-          {/* Quick Admin Setup for Testing */}
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={handleQuickAdminSetup}
-              className="text-sm text-blue-600 hover:text-blue-500 transition-colors duration-200"
-            >
-              Quick Admin Setup (for testing)
             </button>
           </div>
 
