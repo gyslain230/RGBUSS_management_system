@@ -85,7 +85,7 @@ export default function LoginForm() {
                   >
                     create one first
                   </Link>
-                  . Use the "Quick Admin Setup" on the registration page to get started quickly.
+                  . Use the "Quick Admin Setup\" on the registration page to get started quickly.
                 </p>
               </div>
             </div>
