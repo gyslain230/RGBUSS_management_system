@@ -11,7 +11,13 @@ import {
   FileText,
   Calendar,
   Clock,
-  Shield
+  Shield,
+  Eye,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Activity,
+  Target,
+  Zap
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -25,11 +31,13 @@ import {
   Bar,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  AreaChart,
+  Area
 } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import MetricCard from '../components/Dashboard/MetricCard';
 import RecentSalesTable from '../components/Dashboard/RecentSalesTable';
 import StockAlerts from '../components/Dashboard/StockAlerts';
@@ -38,14 +46,27 @@ import toast from 'react-hot-toast';
 
 interface DashboardData {
   revenueToday: number;
+  revenueYesterday: number;
+  revenueWeek: number;
+  revenueMonth: number;
   salesToday: number;
+  salesYesterday: number;
+  salesWeek: number;
+  salesMonth: number;
   productsInStock: number;
+  lowStockCount: number;
   totalRevenue: number;
+  totalUsers: number;
+  pendingCredits: number;
+  overdueCredits: number;
   salesOverview: any[];
   recentSales: any[];
   stockAlerts: any[];
   creditAlerts: any[];
   categoryBreakdown: any[];
+  topProducts: any[];
+  salesTrend: any[];
+  hourlyData: any[];
   previousReports: any[];
 }
 
@@ -53,25 +74,39 @@ export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData>({
     revenueToday: 0,
+    revenueYesterday: 0,
+    revenueWeek: 0,
+    revenueMonth: 0,
     salesToday: 0,
+    salesYesterday: 0,
+    salesWeek: 0,
+    salesMonth: 0,
     productsInStock: 0,
+    lowStockCount: 0,
     totalRevenue: 0,
+    totalUsers: 0,
+    pendingCredits: 0,
+    overdueCredits: 0,
     salesOverview: [],
     recentSales: [],
     stockAlerts: [],
     creditAlerts: [],
     categoryBreakdown: [],
+    topProducts: [],
+    salesTrend: [],
+    hourlyData: [],
     previousReports: []
   });
   const [dataLoading, setDataLoading] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
 
   useEffect(() => {
     // Only fetch data if user is loaded and has proper access
     if (!authLoading && user && (user.role === 'admin' || user.role === 'manager')) {
       fetchDashboardData();
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, timeRange]);
 
   // Show loading while auth is still loading
   if (authLoading) {
@@ -107,39 +142,82 @@ export default function Dashboard() {
     setDataLoading(true);
     try {
       const today = new Date();
+      const yesterday = subDays(today, 1);
+      const weekStart = startOfWeek(today);
+      const monthStart = startOfMonth(today);
+      
       const todayStart = startOfDay(today).toISOString();
       const todayEnd = endOfDay(today).toISOString();
+      const yesterdayStart = startOfDay(yesterday).toISOString();
+      const yesterdayEnd = endOfDay(yesterday).toISOString();
+      const weekStartISO = weekStart.toISOString();
+      const monthStartISO = monthStart.toISOString();
 
-      // Fetch today's sales data
-      const { data: todaySales, error: salesError } = await supabase
-        .from('sales')
-        .select('total_amount, quantity_sold, product_name, customer_name, created_at')
-        .gte('created_at', todayStart)
-        .lte('created_at', todayEnd);
-
-      if (salesError) throw salesError;
-
-      const revenueToday = todaySales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
-      const salesToday = todaySales?.reduce((sum, sale) => sum + sale.quantity_sold, 0) || 0;
-
-      // Fetch total revenue
+      // Fetch all sales data
       const { data: allSales, error: allSalesError } = await supabase
         .from('sales')
-        .select('total_amount, created_at');
+        .select('total_amount, quantity_sold, product_name, customer_name, created_at, product_id');
 
       if (allSalesError) throw allSalesError;
 
+      // Calculate metrics
+      const todaySales = allSales?.filter(sale => 
+        sale.created_at >= todayStart && sale.created_at <= todayEnd
+      ) || [];
+      
+      const yesterdaySales = allSales?.filter(sale => 
+        sale.created_at >= yesterdayStart && sale.created_at <= yesterdayEnd
+      ) || [];
+      
+      const weekSales = allSales?.filter(sale => 
+        sale.created_at >= weekStartISO
+      ) || [];
+      
+      const monthSales = allSales?.filter(sale => 
+        sale.created_at >= monthStartISO
+      ) || [];
+
+      const revenueToday = todaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueYesterday = yesterdaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueWeek = weekSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueMonth = monthSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      
+      const salesToday = todaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesYesterday = yesterdaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesWeekCount = weekSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesMonthCount = monthSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+
       const totalRevenue = allSales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
 
-      // Fetch products in stock
+      // Fetch products data
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('quantity, category, name, id')
+        .select('quantity, category, name, id, price')
         .eq('status', 'approved');
 
       if (productsError) throw productsError;
 
       const productsInStock = products?.reduce((sum, product) => sum + product.quantity, 0) || 0;
+      const lowStockCount = products?.filter(product => product.quantity < 5).length || 0;
+
+      // Fetch users count (admin only)
+      let totalUsers = 0;
+      if (user.role === 'admin') {
+        const usersData = localStorage.getItem('users');
+        if (usersData) {
+          totalUsers = JSON.parse(usersData).length;
+        }
+      }
+
+      // Fetch credits data
+      const { data: credits, error: creditsError } = await supabase
+        .from('credits')
+        .select('*');
+
+      if (creditsError) throw creditsError;
+
+      const pendingCredits = credits?.filter(credit => credit.status === 'pending').length || 0;
+      const overdueCredits = credits?.filter(credit => credit.status === 'overdue').length || 0;
 
       // Fetch recent sales (last 10)
       const { data: recentSales, error: recentSalesError } = await supabase
@@ -185,12 +263,35 @@ export default function Dashboard() {
         salesOverview.push({
           date: format(date, 'MMM dd'),
           revenue: dayRevenue,
-          sales: dayCount
+          sales: dayCount,
+          quantity: daySales.reduce((sum, sale) => sum + sale.quantity_sold, 0)
+        });
+      }
+
+      // Generate hourly data for today
+      const hourlyData = [];
+      for (let hour = 0; hour < 24; hour++) {
+        const hourStart = new Date(today);
+        hourStart.setHours(hour, 0, 0, 0);
+        const hourEnd = new Date(today);
+        hourEnd.setHours(hour, 59, 59, 999);
+        
+        const hourSales = todaySales.filter(sale => {
+          const saleTime = new Date(sale.created_at);
+          return saleTime >= hourStart && saleTime <= hourEnd;
+        });
+        
+        hourlyData.push({
+          hour: `${hour}:00`,
+          sales: hourSales.length,
+          revenue: hourSales.reduce((sum, sale) => sum + sale.total_amount, 0)
         });
       }
 
       // Generate category breakdown
       const categoryMap = new Map();
+      const categoryRevenue = new Map();
+      
       products?.forEach(product => {
         const category = product.category;
         if (categoryMap.has(category)) {
@@ -200,11 +301,66 @@ export default function Dashboard() {
         }
       });
 
-      const categoryBreakdown = Array.from(categoryMap.entries()).map(([name, value]) => ({
+      // Calculate revenue by category
+      allSales?.forEach(sale => {
+        const product = products?.find(p => p.id === sale.product_id);
+        if (product) {
+          const category = product.category;
+          if (categoryRevenue.has(category)) {
+            categoryRevenue.set(category, categoryRevenue.get(category) + sale.total_amount);
+          } else {
+            categoryRevenue.set(category, sale.total_amount);
+          }
+        }
+      });
+
+      const categoryBreakdown = Array.from(categoryMap.entries()).map(([name, quantity]) => ({
         name,
-        value,
+        quantity,
+        revenue: categoryRevenue.get(name) || 0,
         color: `hsl(${Math.random() * 360}, 70%, 50%)`
       }));
+
+      // Generate top products
+      const productSales = new Map();
+      allSales?.forEach(sale => {
+        if (productSales.has(sale.product_name)) {
+          const existing = productSales.get(sale.product_name);
+          productSales.set(sale.product_name, {
+            ...existing,
+            quantity: existing.quantity + sale.quantity_sold,
+            revenue: existing.revenue + sale.total_amount
+          });
+        } else {
+          productSales.set(sale.product_name, {
+            name: sale.product_name,
+            quantity: sale.quantity_sold,
+            revenue: sale.total_amount
+          });
+        }
+      });
+
+      const topProducts = Array.from(productSales.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      // Generate sales trend for last 30 days
+      const salesTrend = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = subDays(today, i);
+        const dayStart = startOfDay(date).toISOString();
+        const dayEnd = endOfDay(date).toISOString();
+        
+        const daySales = allSales?.filter(sale => 
+          sale.created_at >= dayStart && sale.created_at <= dayEnd
+        ) || [];
+        
+        salesTrend.push({
+          date: format(date, 'MMM dd'),
+          revenue: daySales.reduce((sum, sale) => sum + sale.total_amount, 0),
+          sales: daySales.length
+        });
+      }
 
       // Generate mock previous reports
       const previousReports = Array.from({ length: 30 }, (_, i) => {
@@ -220,14 +376,27 @@ export default function Dashboard() {
 
       setData({
         revenueToday,
+        revenueYesterday,
+        revenueWeek,
+        revenueMonth,
         salesToday,
+        salesYesterday,
+        salesWeek: salesWeekCount,
+        salesMonth: salesMonthCount,
         productsInStock,
+        lowStockCount,
         totalRevenue,
+        totalUsers,
+        pendingCredits,
+        overdueCredits,
         salesOverview,
         recentSales: recentSales || [],
         stockAlerts: stockAlerts || [],
         creditAlerts: creditAlerts || [],
         categoryBreakdown,
+        topProducts,
+        salesTrend,
+        hourlyData,
         previousReports
       });
     } catch (error) {
@@ -244,12 +413,25 @@ export default function Dashboard() {
       const today = format(new Date(), 'yyyy-MM-dd');
       const reportData = {
         date: today,
-        revenue: data.revenueToday,
-        sales: data.salesToday,
-        productsInStock: data.productsInStock,
-        recentSales: data.recentSales,
-        stockAlerts: data.stockAlerts,
-        creditAlerts: data.creditAlerts
+        summary: {
+          revenue: data.revenueToday,
+          sales: data.salesToday,
+          productsInStock: data.productsInStock,
+          lowStockAlerts: data.lowStockCount,
+          pendingCredits: data.pendingCredits,
+          overdueCredits: data.overdueCredits
+        },
+        details: {
+          recentSales: data.recentSales,
+          stockAlerts: data.stockAlerts,
+          creditAlerts: data.creditAlerts,
+          topProducts: data.topProducts,
+          categoryBreakdown: data.categoryBreakdown
+        },
+        trends: {
+          hourlyData: data.hourlyData,
+          salesOverview: data.salesOverview
+        }
       };
 
       // Create and download JSON report
@@ -257,13 +439,13 @@ export default function Dashboard() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `daily-report-${today}.json`;
+      a.download = `comprehensive-report-${today}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Today\'s report downloaded successfully!');
+      toast.success('Comprehensive report downloaded successfully!');
     } catch (error) {
       console.error('Error downloading report:', error);
       toast.error('Error downloading report');
@@ -298,231 +480,437 @@ export default function Dashboard() {
     }
   };
 
+  const getRevenueChange = () => {
+    if (data.revenueYesterday === 0) return '+100%';
+    const change = ((data.revenueToday - data.revenueYesterday) / data.revenueYesterday) * 100;
+    return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+  };
+
+  const getSalesChange = () => {
+    if (data.salesYesterday === 0) return '+100%';
+    const change = ((data.salesToday - data.salesYesterday) / data.salesYesterday) * 100;
+    return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+  };
+
   // Show loading for data fetching
   if (dataLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Welcome back, {user?.full_name}</p>
-          <p className="text-sm text-blue-600 capitalize">
-            {user?.role} Access • {format(new Date(), 'EEEE, MMMM do, yyyy')}
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <button 
-            onClick={downloadTodaysReport}
-            disabled={downloadingReport}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {downloadingReport ? 'Downloading...' : 'Today\'s Report'}
-          </button>
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-            <FileText className="h-4 w-4 mr-2" />
-            Previous Reports
-          </button>
-        </div>
-      </div>
-
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Revenue Today"
-          value={`$${data.revenueToday.toLocaleString()}`}
-          icon={DollarSign}
-          change="+12%"
-          changeType="increase"
-        />
-        <MetricCard
-          title="Sales Today"
-          value={data.salesToday.toString()}
-          icon={ShoppingCart}
-          change="+8%"
-          changeType="increase"
-        />
-        <MetricCard
-          title="Products in Stock"
-          value={data.productsInStock.toString()}
-          icon={Package}
-          change="-3%"
-          changeType="decrease"
-        />
-        <MetricCard
-          title="Total Revenue"
-          value={`$${data.totalRevenue.toLocaleString()}`}
-          icon={TrendingUp}
-          change="+15%"
-          changeType="increase"
-        />
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Overview Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Overview (Last 7 Days)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.salesOverview}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip 
-                formatter={(value, name) => [
-                  name === 'revenue' ? `$${value}` : value,
-                  name === 'revenue' ? 'Revenue' : 'Sales Count'
-                ]}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="revenue" 
-                stroke="#3B82F6" 
-                strokeWidth={2}
-                dot={{ fill: '#3B82F6' }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="sales" 
-                stroke="#10B981" 
-                strokeWidth={2}
-                dot={{ fill: '#10B981' }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Category Breakdown */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Stock by Category</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data.categoryBreakdown}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-                label={({ name, value }) => `${name}: ${value}`}
-              >
-                {data.categoryBreakdown.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+      <div className="bg-white shadow-sm border-b border-gray-200 -mx-6 -mt-6 px-6 py-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Business Dashboard</h1>
+            <p className="text-gray-600 mt-1">Welcome back, {user?.full_name}</p>
+            <div className="flex items-center space-x-4 mt-2">
+              <p className="text-sm text-blue-600 capitalize font-medium">
+                {user?.role} Access
+              </p>
+              <span className="text-gray-300">•</span>
+              <p className="text-sm text-gray-500">
+                {format(new Date(), 'EEEE, MMMM do, yyyy')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            {/* Time Range Selector */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              {(['today', 'week', 'month'] as const).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    timeRange === range
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {range.charAt(0).toUpperCase() + range.slice(1)}
+                </button>
+              ))}
+            </div>
+            <button 
+              onClick={downloadTodaysReport}
+              disabled={downloadingReport}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloadingReport ? 'Downloading...' : 'Export Report'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* AI Insights */}
-      <AIInsights />
+      <div className="space-y-8">
+        {/* Key Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Revenue Today</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">${data.revenueToday.toLocaleString()}</p>
+                <p className={`text-sm mt-1 ${
+                  data.revenueToday >= data.revenueYesterday ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {getRevenueChange()} from yesterday
+                </p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <DollarSign className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
 
-      {/* Tables and Alerts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Sales */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Sales Today</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{data.salesToday}</p>
+                <p className={`text-sm mt-1 ${
+                  data.salesToday >= data.salesYesterday ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {getSalesChange()} from yesterday
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <ShoppingCart className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Products in Stock</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{data.productsInStock}</p>
+                <p className="text-sm mt-1 text-orange-600">
+                  {data.lowStockCount} low stock alerts
+                </p>
+              </div>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Package className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">${data.totalRevenue.toLocaleString()}</p>
+                <p className="text-sm mt-1 text-blue-600">
+                  All time earnings
+                </p>
+              </div>
+              <div className="p-3 bg-indigo-100 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-indigo-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Secondary Metrics */}
+        {user.role === 'admin' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Users</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{data.totalUsers}</p>
+                </div>
+                <div className="p-3 bg-cyan-100 rounded-lg">
+                  <Users className="h-6 w-6 text-cyan-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Pending Credits</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{data.pendingCredits}</p>
+                </div>
+                <div className="p-3 bg-yellow-100 rounded-lg">
+                  <CreditCard className="h-6 w-6 text-yellow-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Overdue Credits</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{data.overdueCredits}</p>
+                </div>
+                <div className="p-3 bg-red-100 rounded-lg">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Sales Trend Chart */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Sales Trend</h3>
+                <p className="text-sm text-gray-600">Last 7 days performance</p>
+              </div>
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={data.salesOverview}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  formatter={(value, name) => [
+                    name === 'revenue' ? `$${value}` : value,
+                    name === 'revenue' ? 'Revenue' : name === 'sales' ? 'Sales Count' : 'Quantity'
+                  ]}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#3B82F6" 
+                  fillOpacity={1} 
+                  fill="url(#colorRevenue)"
+                  strokeWidth={2}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="sales" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Hourly Sales Activity */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Today's Activity</h3>
+                <p className="text-sm text-gray-600">Hourly sales breakdown</p>
+              </div>
+              <Activity className="h-5 w-5 text-green-500" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.hourlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="hour" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Bar dataKey="sales" fill="#10B981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Category Breakdown and Top Products */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Category Breakdown */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Stock by Category</h3>
+                <p className="text-sm text-gray-600">Inventory distribution</p>
+              </div>
+              <PieChartIcon className="h-5 w-5 text-purple-500" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={data.categoryBreakdown}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="quantity"
+                  label={({ name, quantity }) => `${name}: ${quantity}`}
+                >
+                  {data.categoryBreakdown.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Top Products */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Top Products</h3>
+                <p className="text-sm text-gray-600">Best performing items</p>
+              </div>
+              <Target className="h-5 w-5 text-orange-500" />
+            </div>
+            <div className="space-y-4">
+              {data.topProducts.slice(0, 5).map((product, index) => (
+                <div key={product.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                        index === 0 ? 'bg-yellow-500' : 
+                        index === 1 ? 'bg-gray-400' : 
+                        index === 2 ? 'bg-orange-500' : 'bg-blue-500'
+                      }`}>
+                        {index + 1}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{product.name}</p>
+                      <p className="text-sm text-gray-600">{product.quantity} sold</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">${product.revenue.toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* AI Insights */}
+        <AIInsights />
+
+        {/* Tables and Alerts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Sales */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Recent Sales</h3>
+                <p className="text-sm text-gray-600">Latest transactions</p>
+              </div>
+              <ShoppingCart className="h-5 w-5 text-blue-500" />
+            </div>
+            
+            {data.recentSales.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p>No recent sales found</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Product</th>
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Amount</th>
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {data.recentSales.slice(0, 8).map((sale) => (
+                      <tr key={sale.id} className="hover:bg-gray-50">
+                        <td className="py-3 text-sm text-gray-900">{sale.product_name}</td>
+                        <td className="py-3 text-sm font-medium text-gray-900">${sale.total_amount}</td>
+                        <td className="py-3 text-sm text-gray-600">
+                          {format(new Date(sale.created_at), 'HH:mm')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Stock Alerts */}
+          <StockAlerts alerts={data.stockAlerts} />
+        </div>
+
+        {/* Credit Alerts */}
+        {data.creditAlerts.length > 0 && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Credit Alerts (Today)</h3>
+                <p className="text-sm text-gray-600">New credit sales requiring attention</p>
+              </div>
+              <CreditCard className="h-5 w-5 text-orange-500" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data.creditAlerts.map((credit) => (
+                <div key={credit.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors">
+                  <div>
+                    <p className="font-medium text-gray-900">{credit.customer_name}</p>
+                    <p className="text-sm text-gray-600">{credit.product_name}</p>
+                    <p className="text-xs text-orange-600">Due: {format(new Date(credit.due_date), 'MMM dd')}</p>
+                  </div>
+                  <span className="text-orange-600 font-semibold">${credit.amount}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Previous Reports Section */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Sales</h3>
-            <ShoppingCart className="h-5 w-5 text-blue-500" />
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Previous Reports</h3>
+              <p className="text-sm text-gray-600">Download historical business reports</p>
+            </div>
+            <Calendar className="h-5 w-5 text-blue-500" />
           </div>
           
-          {data.recentSales.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No recent sales found
-            </div>
-          ) : (
-            <div className="overflow-hidden">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 text-sm font-medium text-gray-500">Product</th>
-                    <th className="text-left py-3 text-sm font-medium text-gray-500">Price</th>
-                    <th className="text-left py-3 text-sm font-medium text-gray-500">Date</th>
-                    <th className="text-left py-3 text-sm font-medium text-gray-500">Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {data.recentSales.slice(0, 8).map((sale) => (
-                    <tr key={sale.id} className="hover:bg-gray-50">
-                      <td className="py-3 text-sm text-gray-900">{sale.product_name}</td>
-                      <td className="py-3 text-sm font-medium text-gray-900">${sale.total_amount}</td>
-                      <td className="py-3 text-sm text-gray-600">
-                        {format(new Date(sale.created_at), 'MMM dd')}
-                      </td>
-                      <td className="py-3 text-sm text-gray-600">
-                        {format(new Date(sale.created_at), 'HH:mm')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Stock Alerts */}
-        <StockAlerts alerts={data.stockAlerts} />
-      </div>
-
-      {/* Credit Alerts */}
-      {data.creditAlerts.length > 0 && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Credit Alerts (Today)</h3>
-            <CreditCard className="h-5 w-5 text-orange-500" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.creditAlerts.map((credit) => (
-              <div key={credit.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+            {data.previousReports.slice(0, 15).map((report) => (
+              <div key={report.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group">
                 <div>
-                  <p className="font-medium text-gray-900">{credit.customer_name}</p>
-                  <p className="text-sm text-gray-600">{credit.product_name}</p>
-                  <p className="text-xs text-orange-600">Due: {format(new Date(credit.due_date), 'MMM dd')}</p>
+                  <p className="font-medium text-gray-900">{report.displayDate}</p>
+                  <p className="text-sm text-gray-600">Revenue: ${report.revenue.toLocaleString()}</p>
+                  <p className="text-sm text-gray-600">Sales: {report.sales}</p>
                 </div>
-                <span className="text-orange-600 font-semibold">${credit.amount}</span>
+                <button
+                  onClick={() => downloadPreviousReport(report)}
+                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  title="Download Report"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Previous Reports Section */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Previous Reports</h3>
-          <Calendar className="h-5 w-5 text-blue-500" />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-          {data.previousReports.slice(0, 15).map((report) => (
-            <div key={report.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              <div>
-                <p className="font-medium text-gray-900">{report.displayDate}</p>
-                <p className="text-sm text-gray-600">Revenue: ${report.revenue}</p>
-                <p className="text-sm text-gray-600">Sales: {report.sales}</p>
-              </div>
-              <button
-                onClick={() => downloadPreviousReport(report)}
-                className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
-                title="Download Report"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
         </div>
       </div>
     </div>
