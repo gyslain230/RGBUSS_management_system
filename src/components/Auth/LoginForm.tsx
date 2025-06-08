@@ -30,9 +30,16 @@ export default function LoginForm() {
       navigate(from, { replace: true });
     } catch (error) {
       // Error handling is done in AuthContext
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Quick admin login for testing
+  const handleQuickAdminLogin = () => {
+    setEmail('admin@rgbuss.com');
+    setPassword('admin123');
   };
 
   return (
@@ -112,6 +119,17 @@ export default function LoginForm() {
               ) : (
                 'Sign in'
               )}
+            </button>
+          </div>
+
+          {/* Quick Admin Login for Testing */}
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleQuickAdminLogin}
+              className="text-sm text-blue-600 hover:text-blue-500 transition-colors duration-200"
+            >
+              Quick Admin Login (for testing)
             </button>
           </div>
 
