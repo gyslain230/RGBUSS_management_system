@@ -138,6 +138,47 @@ export default function Dashboard() {
     );
   }
 
+  // Calculate P.Total for a given date range (Daily Reports logic)
+  const calculatePTotalForDateRange = async (startDate: string, endDate: string) => {
+    try {
+      // Get all approved products
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('status', 'approved');
+
+      if (productsError) throw productsError;
+
+      // Get all sales in the date range
+      const { data: sales, error: salesError } = await supabase
+        .from('sales')
+        .select('*')
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
+
+      if (salesError) throw salesError;
+
+      let totalPTotal = 0;
+
+      // Calculate P.Total for each product (same logic as Daily Reports)
+      (products || []).forEach(product => {
+        const entres = 0; // New stock entries
+        const totalJour = product.quantity + entres; // Total available for the day
+        const solde = product.quantity; // Current balance
+        const sortie = totalJour - solde; // Sortie = Total/Jour - Solde
+        const pUnit1 = product.price; // Unit price
+        const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
+        
+        totalPTotal += pTotal;
+      });
+
+      return totalPTotal;
+    } catch (error) {
+      console.error('Error calculating P.Total:', error);
+      return 0;
+    }
+  };
+
   const fetchDashboardData = async () => {
     setDataLoading(true);
     try {
@@ -187,7 +228,8 @@ export default function Dashboard() {
       const salesWeekCount = weekSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
       const salesMonthCount = monthSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
 
-      const totalRevenue = allSales?.reduce((sum, sale) => sum + sale.total_amount, 0) || 0;
+      // Calculate Total Revenue using P.Total logic from Daily Reports
+      const totalRevenue = await calculatePTotalForDateRange('1970-01-01T00:00:00.000Z', new Date().toISOString());
 
       // Fetch products data
       const { data: products, error: productsError } = await supabase
@@ -385,7 +427,7 @@ export default function Dashboard() {
         salesMonth: salesMonthCount,
         productsInStock,
         lowStockCount,
-        totalRevenue,
+        totalRevenue, // Now calculated using P.Total logic
         totalUsers,
         pendingCredits,
         overdueCredits,
@@ -419,7 +461,8 @@ export default function Dashboard() {
           productsInStock: data.productsInStock,
           lowStockAlerts: data.lowStockCount,
           pendingCredits: data.pendingCredits,
-          overdueCredits: data.overdueCredits
+          overdueCredits: data.overdueCredits,
+          totalRevenue: data.totalRevenue // Now matches P.Total calculation
         },
         details: {
           recentSales: data.recentSales,
@@ -520,6 +563,10 @@ export default function Dashboard() {
               <p className="text-sm text-gray-500">
                 {format(new Date(), 'EEEE, MMMM do, yyyy')}
               </p>
+              <span className="text-gray-300">•</span>
+              <p className="text-xs text-green-600 font-medium">
+                📊 Revenue synced with Daily Reports
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
@@ -608,8 +655,8 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">${data.totalRevenue.toLocaleString()}</p>
-                <p className="text-sm mt-1 text-blue-600">
-                  All time earnings
+                <p className="text-sm mt-1 text-green-600">
+                  📊 From P.Total calculations
                 </p>
               </div>
               <div className="p-3 bg-indigo-100 rounded-lg">
