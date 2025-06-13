@@ -115,12 +115,12 @@ export default function DailyReports() {
           // Calculate values based on business logic
           const stock = previousDayStock; // Stock = previous day's solde
           const totalJour = stock + entres; // Total available for the day
-          const solde = product.quantity; // Current balance (end of day)
+          const solde = Number(product.quantity) || 0; // Current balance (end of day)
           
           // Sortie = Total/Jour - Solde
           const sortie = totalJour - solde;
           
-          const pUnit1 = product.price; // Unit price
+          const pUnit1 = Number(product.price) || 0; // Unit price
           const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
           const amavide = Math.max(0, solde - 5); // Available minus minimum stock (5)
 
@@ -382,11 +382,11 @@ export default function DailyReports() {
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
-                      ${item.pUnit1.toFixed(2)}
+                      ${Number(item.pUnit1).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
                       <span className={item.pTotal > 0 ? 'text-green-600 font-medium' : ''}>
-                        ${item.pTotal.toFixed(2)}
+                        ${Number(item.pTotal).toFixed(2)}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
