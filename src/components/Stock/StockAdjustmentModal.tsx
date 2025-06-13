@@ -302,5 +302,3 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
     </div>
   );
 }
-
-export default StockAdjustmentModal
