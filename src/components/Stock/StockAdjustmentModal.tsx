@@ -36,23 +36,39 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
   const onSubmit = async (data: AdjustmentFormData) => {
     if (!user) return;
 
+    // Convert quantity to number to ensure proper calculation
+    const adjustmentQuantity = Number(data.quantity);
+    const currentQuantity = Number(product.quantity);
+
     // Validate adjustment
-    if (data.adjustment_type === 'decrease' && data.quantity > product.quantity) {
+    if (data.adjustment_type === 'decrease' && adjustmentQuantity > currentQuantity) {
       toast.error('Cannot decrease stock below zero');
       return;
     }
 
-    if (data.quantity <= 0) {
+    if (adjustmentQuantity <= 0) {
       toast.error('Quantity must be greater than zero');
       return;
     }
 
     setLoading(true);
     try {
-      const previousQuantity = product.quantity;
+      const previousQuantity = currentQuantity;
+      
+      // Ensure proper numeric calculation
       const newQuantity = data.adjustment_type === 'increase' 
-        ? previousQuantity + data.quantity 
-        : previousQuantity - data.quantity;
+        ? previousQuantity + adjustmentQuantity 
+        : previousQuantity - adjustmentQuantity;
+
+      console.log('Stock Adjustment Calculation:', {
+        previousQuantity,
+        adjustmentQuantity,
+        adjustmentType: data.adjustment_type,
+        newQuantity,
+        calculation: data.adjustment_type === 'increase' 
+          ? `${previousQuantity} + ${adjustmentQuantity} = ${newQuantity}`
+          : `${previousQuantity} - ${adjustmentQuantity} = ${newQuantity}`
+      });
 
       // Update product quantity
       const { error: updateError } = await supabase
@@ -72,7 +88,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
           product_id: product.id,
           product_name: product.name,
           adjustment_type: data.adjustment_type,
-          quantity_adjusted: data.quantity,
+          quantity_adjusted: adjustmentQuantity,
           previous_quantity: previousQuantity,
           new_quantity: newQuantity,
           reason: data.reason,
@@ -83,7 +99,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
       if (adjustmentError) throw adjustmentError;
 
       toast.success(
-        `Stock ${data.adjustment_type === 'increase' ? 'increased' : 'decreased'} successfully!`
+        `Stock ${data.adjustment_type === 'increase' ? 'increased' : 'decreased'} successfully! ${previousQuantity} → ${newQuantity}`
       );
       
       reset();
@@ -98,10 +114,13 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
   };
 
   const getNewQuantity = () => {
+    const currentQty = Number(product.quantity);
+    const adjustQty = Number(watchQuantity) || 0;
+    
     if (watchAdjustmentType === 'increase') {
-      return product.quantity + watchQuantity;
+      return currentQty + adjustQty;
     } else {
-      return Math.max(0, product.quantity - watchQuantity);
+      return Math.max(0, currentQty - adjustQty);
     }
   };
 
@@ -182,7 +201,8 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
                 min: { value: 1, message: 'Quantity must be at least 1' },
                 max: watchAdjustmentType === 'decrease' 
                   ? { value: product.quantity, message: 'Cannot decrease more than current stock' }
-                  : undefined
+                  : undefined,
+                valueAsNumber: true // This ensures the value is treated as a number
               })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter quantity"
@@ -232,6 +252,12 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
                   watchAdjustmentType === 'increase' ? 'text-green-600' : 'text-red-600'
                 }`}>
                   {watchAdjustmentType === 'increase' ? '+' : '-'}{watchQuantity}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-600">Calculation:</span>
+                <span className="text-xs text-gray-600">
+                  {product.quantity} {watchAdjustmentType === 'increase' ? '+' : '-'} {watchQuantity} = {getNewQuantity()}
                 </span>
               </div>
               <div className="flex justify-between border-t pt-1">
