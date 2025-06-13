@@ -7,7 +7,6 @@ import RegisterForm from './components/Auth/RegisterForm';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import StockManagement from './pages/StockManagement';
-import SalesManagement from './pages/SalesManagement';
 import DailyReports from './pages/DailyReports';
 import UserManagement from './pages/UserManagement';
 import CreditPanel from './pages/CreditPanel';
@@ -60,14 +59,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <StockManagement />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/sales" element={
-              <ProtectedRoute>
-                <Layout>
-                  <SalesManagement />
                 </Layout>
               </ProtectedRoute>
             } />
