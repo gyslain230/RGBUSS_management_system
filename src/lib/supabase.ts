@@ -22,19 +22,6 @@ export interface Product {
   updated_at: string;
 }
 
-export interface Sale {
-  id: string;
-  product_id: string;
-  product_name: string;
-  quantity_sold: number;
-  unit_price: number;
-  total_amount: number;
-  sold_by: string;
-  customer_name?: string;
-  is_credit: boolean;
-  created_at: string;
-}
-
 export interface Credit {
   id: string;
   sale_id: string;
@@ -304,9 +291,6 @@ const initializeData = () => {
   }
 
   // Initialize empty arrays for other tables
-  if (!localStorage.getItem('sales')) {
-    localStorage.setItem('sales', JSON.stringify([]));
-  }
   if (!localStorage.getItem('credits')) {
     localStorage.setItem('credits', JSON.stringify([]));
   }
