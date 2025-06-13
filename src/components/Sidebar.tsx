@@ -34,7 +34,7 @@ const navigation = [
     name: 'Daily Reports',
     href: '/reports',
     icon: FileText,
-    roles: ['admin', 'manager']
+    roles: ['admin', 'manager', 'worker']
   },
   {
     name: 'User Management',
