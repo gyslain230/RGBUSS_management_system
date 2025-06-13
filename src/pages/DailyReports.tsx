@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, RefreshCw } from 'lucide-react';
+import { FileText, Download, Calendar, RefreshCw, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Product, Sale, StockAdjustment } from '../lib/supabase';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
 interface DailyReportData {
@@ -25,10 +25,40 @@ export default function DailyReports() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [refreshing, setRefreshing] = useState(false);
+  const [isFirstDay, setIsFirstDay] = useState(false);
 
   useEffect(() => {
     fetchReportData();
   }, [selectedDate]);
+
+  const getPreviousDayStock = async (productId: string, currentDate: string) => {
+    try {
+      const previousDate = format(subDays(new Date(currentDate), 1), 'yyyy-MM-dd');
+      
+      // Check if there are any stock adjustments before the current date
+      const { data: historicalAdjustments, error } = await supabase
+        .from('stock_adjustments')
+        .select('*')
+        .eq('product_id', productId)
+        .lt('created_at', `${currentDate}T00:00:00.000Z`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      // If no historical adjustments exist, this is the first day - stock should be 0
+      if (!historicalAdjustments || historicalAdjustments.length === 0) {
+        return 0;
+      }
+
+      // Get the last known stock level from the most recent adjustment before current date
+      const lastAdjustment = historicalAdjustments[0];
+      return lastAdjustment.new_quantity;
+    } catch (error) {
+      console.error('Error getting previous day stock:', error);
+      return 0;
+    }
+  };
 
   const fetchReportData = async () => {
     setLoading(true);
@@ -54,39 +84,61 @@ export default function DailyReports() {
 
       if (adjustmentsError) throw adjustmentsError;
 
+      // Check if this is the first day with any stock adjustments
+      const { data: allAdjustments, error: allAdjustmentsError } = await supabase
+        .from('stock_adjustments')
+        .select('created_at')
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (allAdjustmentsError) throw allAdjustmentsError;
+
+      const firstAdjustmentDate = allAdjustments && allAdjustments.length > 0 
+        ? allAdjustments[0].created_at.split('T')[0] 
+        : null;
+      
+      const isFirstDayEver = !firstAdjustmentDate || selectedDate <= firstAdjustmentDate;
+      setIsFirstDay(isFirstDayEver);
+
       // Process data for each product
-      const processedData: DailyReportData[] = (products || []).map((product, index) => {
-        // Calculate stock adjustments (entres) for this product on the selected date
-        const productAdjustments = (adjustments || []).filter(adj => adj.product_id === product.id);
-        const entres = productAdjustments
-          .filter(adj => adj.adjustment_type === 'increase')
-          .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
+      const processedData: DailyReportData[] = await Promise.all(
+        (products || []).map(async (product, index) => {
+          // Get stock from previous day (0 if first day)
+          const previousDayStock = isFirstDayEver ? 0 : await getPreviousDayStock(product.id, selectedDate);
+          
+          // Calculate stock adjustments (entres) for this product on the selected date
+          const productAdjustments = (adjustments || []).filter(adj => adj.product_id === product.id);
+          const entres = productAdjustments
+            .filter(adj => adj.adjustment_type === 'increase')
+            .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
 
-        // Calculate values based on your business logic
-        const totalJour = product.quantity + entres; // Total available for the day
-        const solde = product.quantity; // Current balance
-        
-        // Sortie = Total/Jour - Solde
-        const sortie = totalJour - solde;
-        
-        const pUnit1 = product.price; // Unit price
-        const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
-        const amavide = Math.max(0, product.quantity - 5); // Available minus minimum stock (5)
+          // Calculate values based on business logic
+          const stock = previousDayStock; // Stock = previous day's solde
+          const totalJour = stock + entres; // Total available for the day
+          const solde = product.quantity; // Current balance (end of day)
+          
+          // Sortie = Total/Jour - Solde
+          const sortie = totalJour - solde;
+          
+          const pUnit1 = product.price; // Unit price
+          const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
+          const amavide = Math.max(0, solde - 5); // Available minus minimum stock (5)
 
-        return {
-          no: index + 1,
-          libelle: product.name,
-          stock: product.quantity,
-          entres, // Now calculated from actual stock adjustments
-          totalJour,
-          solde,
-          sortie,
-          pUnit1,
-          pTotal,
-          amavide,
-          productId: product.id
-        };
-      });
+          return {
+            no: index + 1,
+            libelle: product.name,
+            stock, // Now based on previous day's solde
+            entres, // Calculated from actual stock adjustments
+            totalJour,
+            solde,
+            sortie,
+            pUnit1,
+            pTotal,
+            amavide,
+            productId: product.id
+          };
+        })
+      );
 
       setReportData(processedData);
     } catch (error) {
@@ -108,6 +160,7 @@ export default function DailyReports() {
     try {
       const reportContent = {
         date: selectedDate,
+        isFirstDay,
         generatedAt: new Date().toISOString(),
         generatedBy: user?.full_name,
         data: reportData,
@@ -117,7 +170,8 @@ export default function DailyReports() {
           totalEntres: reportData.reduce((sum, item) => sum + item.entres, 0),
           totalSorties: reportData.reduce((sum, item) => sum + item.sortie, 0),
           totalRevenue: reportData.reduce((sum, item) => sum + item.pTotal, 0)
-        }
+        },
+        note: isFirstDay ? 'This is the first day - stock values are 0 as there is no previous day data' : 'Stock values based on previous day\'s solde'
       };
 
       const blob = new Blob([JSON.stringify(reportContent, null, 2)], { type: 'application/json' });
@@ -153,7 +207,7 @@ export default function DailyReports() {
           <h1 className="text-2xl font-bold text-gray-900">Daily Reports</h1>
           <p className="text-gray-600">Comprehensive daily inventory and sales report</p>
           <p className="text-sm text-green-600 mt-1">
-            📊 Entres now calculated from actual stock adjustments
+            📊 Stock = Previous day's solde • Entres = Today's stock adjustments
           </p>
         </div>
         
@@ -190,6 +244,26 @@ export default function DailyReports() {
         </div>
       </div>
 
+      {/* First Day Notice */}
+      {isFirstDay && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex">
+            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">
+                First Day Notice
+              </h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <p>
+                  This appears to be the first day of operations or the selected date has no previous day data. 
+                  All stock values are set to 0 as there is no previous day's solde to reference.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Report Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -201,6 +275,7 @@ export default function DailyReports() {
           <p className="text-2xl font-bold text-blue-600">
             {reportData.reduce((sum, item) => sum + item.stock, 0)}
           </p>
+          {isFirstDay && <p className="text-xs text-blue-500">First day - all 0</p>}
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Entres</p>
@@ -226,6 +301,7 @@ export default function DailyReports() {
               </h2>
               <p className="text-sm text-gray-600">
                 Generated by {user?.full_name} • {reportData.length} products
+                {isFirstDay && <span className="text-blue-600 ml-2">• First Day</span>}
               </p>
             </div>
             <FileText className="h-6 w-6 text-blue-600" />
@@ -250,6 +326,7 @@ export default function DailyReports() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
                     Stock
+                    {isFirstDay && <div className="text-xs text-blue-500 normal-case">(First day)</div>}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
                     Entres
@@ -284,7 +361,9 @@ export default function DailyReports() {
                       {item.libelle}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
-                      {item.stock}
+                      <span className={isFirstDay ? 'text-blue-600' : ''}>
+                        {item.stock}
+                      </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
                       <span className={item.entres > 0 ? 'text-green-600 font-medium' : ''}>
@@ -329,7 +408,9 @@ export default function DailyReports() {
                     {reportData.length} Products
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                    {reportData.reduce((sum, item) => sum + item.stock, 0)}
+                    <span className={isFirstDay ? 'text-blue-600' : ''}>
+                      {reportData.reduce((sum, item) => sum + item.stock, 0)}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 border-r border-gray-200">
                     {reportData.reduce((sum, item) => sum + item.entres, 0)}
