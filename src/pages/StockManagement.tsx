@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Check, X, Package } from 'lucide-react';
+import { Plus, Search, Filter, Check, X, Package, History } from 'lucide-react';
 import { supabase, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddProductModal from '../components/Stock/AddProductModal';
 import ProductCard from '../components/Stock/ProductCard';
+import StockAdjustmentHistory from '../components/Stock/StockAdjustmentHistory';
 
 export default function StockManagement() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showGlobalHistory, setShowGlobalHistory] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -100,17 +102,41 @@ export default function StockManagement() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
           <p className="text-gray-600">Manage your inventory and product listings</p>
+          {(user?.role === 'worker' || user?.role === 'manager') && (
+            <p className="text-sm text-blue-600 mt-1">
+              ⚙️ You can adjust stock quantities for approved products
+            </p>
+          )}
         </div>
-        {(user?.role === 'admin' || user?.role === 'manager') && (
+        <div className="flex items-center space-x-3">
+          {/* Global History Button */}
           <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => setShowGlobalHistory(!showGlobalHistory)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
+            <History className="h-4 w-4 mr-2" />
+            {showGlobalHistory ? 'Hide' : 'Show'} History
           </button>
-        )}
+          
+          {/* Add Product Button */}
+          {(user?.role === 'admin' || user?.role === 'manager') && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Global Stock Adjustment History */}
+      {showGlobalHistory && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <StockAdjustmentHistory />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -175,6 +201,7 @@ export default function StockManagement() {
               product={product}
               onApprove={handleApproveProduct}
               onReject={handleRejectProduct}
+              onStockUpdated={fetchProducts}
               canManage={user?.role === 'admin'}
             />
           ))}

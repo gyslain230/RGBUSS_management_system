@@ -47,6 +47,20 @@ export interface Credit {
   created_at: string;
 }
 
+export interface StockAdjustment {
+  id: string;
+  product_id: string;
+  product_name: string;
+  adjustment_type: 'increase' | 'decrease';
+  quantity_adjusted: number;
+  previous_quantity: number;
+  new_quantity: number;
+  reason: string;
+  adjusted_by: string;
+  adjusted_by_name: string;
+  created_at: string;
+}
+
 export interface DailyReport {
   id: string;
   report_date: string;
@@ -298,6 +312,9 @@ const initializeData = () => {
   }
   if (!localStorage.getItem('user_profiles')) {
     localStorage.setItem('user_profiles', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('stock_adjustments')) {
+    localStorage.setItem('stock_adjustments', JSON.stringify([]));
   }
 };
 

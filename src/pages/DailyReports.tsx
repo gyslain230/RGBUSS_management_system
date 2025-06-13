@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Product, Sale } from '../lib/supabase';
+import { supabase, Product, Sale, StockAdjustment } from '../lib/supabase';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -42,30 +42,31 @@ export default function DailyReports() {
 
       if (productsError) throw productsError;
 
-      // Fetch sales for the selected date
+      // Fetch stock adjustments for the selected date
       const startOfDay = `${selectedDate}T00:00:00.000Z`;
       const endOfDay = `${selectedDate}T23:59:59.999Z`;
 
-      const { data: sales, error: salesError } = await supabase
-        .from('sales')
+      const { data: adjustments, error: adjustmentsError } = await supabase
+        .from('stock_adjustments')
         .select('*')
         .gte('created_at', startOfDay)
         .lte('created_at', endOfDay);
 
-      if (salesError) throw salesError;
+      if (adjustmentsError) throw adjustmentsError;
 
       // Process data for each product
       const processedData: DailyReportData[] = (products || []).map((product, index) => {
-        // Calculate sales for this product on the selected date
-        const productSales = (sales || []).filter(sale => sale.product_id === product.id);
-        const totalSold = productSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+        // Calculate stock adjustments (entres) for this product on the selected date
+        const productAdjustments = (adjustments || []).filter(adj => adj.product_id === product.id);
+        const entres = productAdjustments
+          .filter(adj => adj.adjustment_type === 'increase')
+          .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
 
         // Calculate values based on your business logic
-        const entres = 0; // New stock entries for the day (you can modify this logic)
         const totalJour = product.quantity + entres; // Total available for the day
         const solde = product.quantity; // Current balance
         
-        // NEW LOGIC: Sortie = Total/Jour - Solde
+        // Sortie = Total/Jour - Solde
         const sortie = totalJour - solde;
         
         const pUnit1 = product.price; // Unit price
@@ -76,7 +77,7 @@ export default function DailyReports() {
           no: index + 1,
           libelle: product.name,
           stock: product.quantity,
-          entres,
+          entres, // Now calculated from actual stock adjustments
           totalJour,
           solde,
           sortie,
@@ -151,11 +152,9 @@ export default function DailyReports() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Daily Reports</h1>
           <p className="text-gray-600">Comprehensive daily inventory and sales report</p>
-          {user?.role === 'worker' && (
-            <p className="text-sm text-blue-600 mt-1">
-              📊 View-only access • Contact manager for modifications
-            </p>
-          )}
+          <p className="text-sm text-green-600 mt-1">
+            📊 Entres now calculated from actual stock adjustments
+          </p>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -204,9 +203,9 @@ export default function DailyReports() {
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Sorties</p>
-          <p className="text-2xl font-bold text-red-600">
-            {reportData.reduce((sum, item) => sum + item.sortie, 0)}
+          <p className="text-sm text-gray-600">Total Entres</p>
+          <p className="text-2xl font-bold text-green-600">
+            {reportData.reduce((sum, item) => sum + item.entres, 0)}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -288,7 +287,9 @@ export default function DailyReports() {
                       {item.stock}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
-                      {item.entres}
+                      <span className={item.entres > 0 ? 'text-green-600 font-medium' : ''}>
+                        {item.entres}
+                      </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 border-r border-gray-200">
                       {item.totalJour}
@@ -330,7 +331,7 @@ export default function DailyReports() {
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                     {reportData.reduce((sum, item) => sum + item.stock, 0)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
+                  <td className="px-4 py-3 text-sm text-green-600 border-r border-gray-200">
                     {reportData.reduce((sum, item) => sum + item.entres, 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
