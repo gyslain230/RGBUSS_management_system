@@ -258,64 +258,31 @@ class MockTable {
 
 export const supabase = new MockSupabaseClient();
 
-// Initialize with some sample data
+// Initialize with completely empty data for fresh restart
 const initializeData = () => {
-  // Sample products
-  if (!localStorage.getItem('products')) {
-    const sampleProducts: Product[] = [
-      {
-        id: '1',
-        name: 'Laptop Computer',
-        price: 999.99,
-        quantity: 10,
-        category: 'Electronics',
-        description: 'High-performance laptop for business use',
-        status: 'approved',
-        created_by: '1',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: '2',
-        name: 'Office Chair',
-        price: 199.99,
-        quantity: 5,
-        category: 'Furniture',
-        description: 'Ergonomic office chair with lumbar support',
-        status: 'approved',
-        created_by: '1',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: '3',
-        name: 'Coffee Mug',
-        price: 12.99,
-        quantity: 2,
-        category: 'Kitchen',
-        description: 'Ceramic coffee mug with company logo',
-        status: 'approved',
-        created_by: '1',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ];
-    localStorage.setItem('products', JSON.stringify(sampleProducts));
-  }
-
-  // Initialize empty arrays for other tables
-  if (!localStorage.getItem('sales')) {
-    localStorage.setItem('sales', JSON.stringify([]));
-  }
-  if (!localStorage.getItem('credits')) {
-    localStorage.setItem('credits', JSON.stringify([]));
-  }
-  if (!localStorage.getItem('user_profiles')) {
-    localStorage.setItem('user_profiles', JSON.stringify([]));
-  }
-  if (!localStorage.getItem('stock_adjustments')) {
-    localStorage.setItem('stock_adjustments', JSON.stringify([]));
-  }
+  console.log('🔄 Initializing fresh data - clearing all existing data...');
+  
+  // Clear all existing data
+  localStorage.removeItem('products');
+  localStorage.removeItem('sales');
+  localStorage.removeItem('credits');
+  localStorage.removeItem('user_profiles');
+  localStorage.removeItem('stock_adjustments');
+  localStorage.removeItem('daily_reports');
+  
+  // Initialize with empty arrays - completely fresh start
+  localStorage.setItem('products', JSON.stringify([]));
+  localStorage.setItem('sales', JSON.stringify([]));
+  localStorage.setItem('credits', JSON.stringify([]));
+  localStorage.setItem('user_profiles', JSON.stringify([]));
+  localStorage.setItem('stock_adjustments', JSON.stringify([]));
+  localStorage.setItem('daily_reports', JSON.stringify([]));
+  
+  console.log('✅ Fresh restart complete - all data cleared');
+  console.log('📊 Products: 0');
+  console.log('💰 Sales: 0');
+  console.log('📋 Stock Adjustments: 0');
+  console.log('📈 Daily Reports: 0');
 };
 
 // Initialize data when module loads
