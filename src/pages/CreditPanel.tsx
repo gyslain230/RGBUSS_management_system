@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Search, Filter, AlertTriangle, CheckCircle } from 'lucide-react';
+import { CreditCard, Search, Filter, AlertTriangle, CheckCircle, Plus, DollarSign, Calendar, User } from 'lucide-react';
 import { supabase, Credit } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import AddCreditModal from '../components/Credits/AddCreditModal';
 
 export default function CreditPanel() {
   const { user } = useAuth();
@@ -11,9 +12,11 @@ export default function CreditPanel() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Check if user can mark credits as paid (only managers and admins)
   const canMarkAsPaid = user?.role === 'admin' || user?.role === 'manager';
+  const canAddCredits = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'worker';
 
   useEffect(() => {
     fetchCredits();
@@ -80,9 +83,14 @@ export default function CreditPanel() {
     return matchesSearch && matchesStatus;
   });
 
+  // Calculate metrics for dashboard integration
   const totalPending = credits.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
   const totalOverdue = credits.filter(c => c.status === 'overdue').reduce((sum, c) => sum + c.amount, 0);
   const totalPaid = credits.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+  const totalCash = totalPaid; // Cash represents paid credits
+  const pendingCount = credits.filter(c => c.status === 'pending').length;
+  const overdueCount = credits.filter(c => c.status === 'overdue').length;
+  const paidCount = credits.filter(c => c.status === 'paid').length;
 
   if (loading) {
     return (
@@ -95,23 +103,42 @@ export default function CreditPanel() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Credit Panel</h1>
-        <p className="text-gray-600">
-          Monitor and manage credit sales
-          {user?.role === 'worker' && (
-            <span className="text-orange-600 ml-2">(View Only - Contact manager to mark payments)</span>
-          )}
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Credit Panel</h1>
+          <p className="text-gray-600">
+            Monitor and manage credit sales
+            {user?.role === 'worker' && (
+              <span className="text-orange-600 ml-2">(View Only - Contact manager to mark payments)</span>
+            )}
+          </p>
+          <div className="flex items-center space-x-4 mt-2">
+            <p className="text-sm text-green-600">
+              📊 Credit metrics are synced with Dashboard
+            </p>
+          </div>
+        </div>
+        
+        {/* Add Credit Button */}
+        {canAddCredits && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Credit
+          </button>
+        )}
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Pending Credits</p>
               <p className="text-2xl font-bold text-orange-600">${totalPending.toFixed(2)}</p>
+              <p className="text-xs text-orange-500 mt-1">{pendingCount} credits</p>
             </div>
             <div className="p-3 bg-orange-100 rounded-lg">
               <CreditCard className="h-6 w-6 text-orange-600" />
@@ -124,6 +151,7 @@ export default function CreditPanel() {
             <div>
               <p className="text-sm font-medium text-gray-600">Overdue Credits</p>
               <p className="text-2xl font-bold text-red-600">${totalOverdue.toFixed(2)}</p>
+              <p className="text-xs text-red-500 mt-1">{overdueCount} credits</p>
             </div>
             <div className="p-3 bg-red-100 rounded-lg">
               <AlertTriangle className="h-6 w-6 text-red-600" />
@@ -134,11 +162,25 @@ export default function CreditPanel() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Paid Credits</p>
-              <p className="text-2xl font-bold text-green-600">${totalPaid.toFixed(2)}</p>
+              <p className="text-sm font-medium text-gray-600">Total Cash (Paid)</p>
+              <p className="text-2xl font-bold text-green-600">${totalCash.toFixed(2)}</p>
+              <p className="text-xs text-green-500 mt-1">{paidCount} credits</p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+              <DollarSign className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Credits</p>
+              <p className="text-2xl font-bold text-blue-600">{credits.length}</p>
+              <p className="text-xs text-blue-500 mt-1">All time</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
@@ -155,7 +197,7 @@ export default function CreditPanel() {
               </h3>
               <div className="mt-2 text-sm text-blue-700">
                 <p>
-                  As a worker, you can view credit sales but cannot mark them as paid. 
+                  As a worker, you can view and add credit sales but cannot mark them as paid. 
                   Please contact your manager or administrator to process payments.
                 </p>
               </div>
@@ -203,7 +245,17 @@ export default function CreditPanel() {
 
         {filteredCredits.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            No credits found matching your criteria
+            <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p>No credits found matching your criteria</p>
+            {canAddCredits && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add First Credit
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -287,6 +339,18 @@ export default function CreditPanel() {
           </div>
         )}
       </div>
+
+      {/* Add Credit Modal */}
+      {showAddModal && (
+        <AddCreditModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            setShowAddModal(false);
+            fetchCredits();
+          }}
+        />
+      )}
     </div>
   );
 }

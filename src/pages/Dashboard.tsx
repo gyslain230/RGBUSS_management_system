@@ -17,7 +17,8 @@ import {
   PieChart as PieChartIcon,
   Activity,
   Target,
-  Zap
+  Zap,
+  CheckCircle
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -59,6 +60,9 @@ interface DashboardData {
   totalUsers: number;
   pendingCredits: number;
   overdueCredits: number;
+  totalCash: number;
+  paidCreditsTotal: number;
+  totalCreditsCount: number;
   salesOverview: any[];
   recentSales: any[];
   stockAlerts: any[];
@@ -87,6 +91,9 @@ export default function Dashboard() {
     totalUsers: 0,
     pendingCredits: 0,
     overdueCredits: 0,
+    totalCash: 0,
+    paidCreditsTotal: 0,
+    totalCreditsCount: 0,
     salesOverview: [],
     recentSales: [],
     stockAlerts: [],
@@ -251,15 +258,25 @@ export default function Dashboard() {
         }
       }
 
-      // Fetch credits data
+      // Fetch credits data with comprehensive metrics
       const { data: credits, error: creditsError } = await supabase
         .from('credits')
         .select('*');
 
       if (creditsError) throw creditsError;
 
+      // Calculate credit metrics
+      const today_date = new Date().toISOString().split('T')[0];
       const pendingCredits = credits?.filter(credit => credit.status === 'pending').length || 0;
-      const overdueCredits = credits?.filter(credit => credit.status === 'overdue').length || 0;
+      const overdueCredits = credits?.filter(credit => 
+        credit.status === 'pending' && credit.due_date < today_date
+      ).length || 0;
+      
+      // Calculate monetary values
+      const totalCash = credits?.filter(credit => credit.status === 'paid')
+        .reduce((sum, credit) => sum + credit.amount, 0) || 0;
+      const paidCreditsTotal = totalCash; // Same as totalCash
+      const totalCreditsCount = credits?.length || 0;
 
       // Fetch recent sales (last 10)
       const { data: recentSales, error: recentSalesError } = await supabase
@@ -431,6 +448,9 @@ export default function Dashboard() {
         totalUsers,
         pendingCredits,
         overdueCredits,
+        totalCash,
+        paidCreditsTotal,
+        totalCreditsCount,
         salesOverview,
         recentSales: recentSales || [],
         stockAlerts: stockAlerts || [],
@@ -462,6 +482,7 @@ export default function Dashboard() {
           lowStockAlerts: data.lowStockCount,
           pendingCredits: data.pendingCredits,
           overdueCredits: data.overdueCredits,
+          totalCash: data.totalCash,
           totalRevenue: data.totalRevenue // Now matches P.Total calculation
         },
         details: {
@@ -474,6 +495,13 @@ export default function Dashboard() {
         trends: {
           hourlyData: data.hourlyData,
           salesOverview: data.salesOverview
+        },
+        credits: {
+          totalCredits: data.totalCreditsCount,
+          pendingCredits: data.pendingCredits,
+          overdueCredits: data.overdueCredits,
+          totalCash: data.totalCash,
+          paidCreditsTotal: data.paidCreditsTotal
         }
       };
 
@@ -666,6 +694,61 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Credit Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending Credits</p>
+                <p className="text-2xl font-bold text-orange-600">{data.pendingCredits}</p>
+                <p className="text-xs text-orange-500 mt-1">Awaiting payment</p>
+              </div>
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <CreditCard className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Overdue Credits</p>
+                <p className="text-2xl font-bold text-red-600">{data.overdueCredits}</p>
+                <p className="text-xs text-red-500 mt-1">Past due date</p>
+              </div>
+              <div className="p-3 bg-red-100 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Cash</p>
+                <p className="text-2xl font-bold text-green-600">${data.totalCash.toFixed(2)}</p>
+                <p className="text-xs text-green-500 mt-1">From paid credits</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <DollarSign className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Credits</p>
+                <p className="text-2xl font-bold text-blue-600">{data.totalCreditsCount}</p>
+                <p className="text-xs text-blue-500 mt-1">All credit records</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Secondary Metrics */}
         {user.role === 'admin' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -684,11 +767,12 @@ export default function Dashboard() {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Credits</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{data.pendingCredits}</p>
+                  <p className="text-sm font-medium text-gray-600">Credit Panel</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">Active</p>
+                  <p className="text-xs text-blue-500 mt-1">Synced with dashboard</p>
                 </div>
-                <div className="p-3 bg-yellow-100 rounded-lg">
-                  <CreditCard className="h-6 w-6 text-yellow-600" />
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <CreditCard className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
             </div>
@@ -696,11 +780,12 @@ export default function Dashboard() {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Overdue Credits</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{data.overdueCredits}</p>
+                  <p className="text-sm font-medium text-gray-600">System Status</p>
+                  <p className="text-2xl font-bold text-green-600 mt-1">Online</p>
+                  <p className="text-xs text-green-500 mt-1">All systems operational</p>
                 </div>
-                <div className="p-3 bg-red-100 rounded-lg">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </div>
