@@ -63,8 +63,11 @@ export default function DailyReports() {
         // Calculate values based on your business logic
         const entres = 0; // New stock entries for the day (you can modify this logic)
         const totalJour = product.quantity + entres; // Total available for the day
-        const sortie = totalSold; // Items sold (exit)
         const solde = product.quantity; // Current balance
+        
+        // NEW LOGIC: Sortie = Total/Jour - Solde
+        const sortie = totalJour - solde;
+        
         const pUnit1 = product.price; // Unit price
         const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
         const amavide = Math.max(0, product.quantity - 5); // Available minus minimum stock (5)
