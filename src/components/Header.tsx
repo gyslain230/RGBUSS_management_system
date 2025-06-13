@@ -6,13 +6,13 @@ export default function Header() {
   const { user, signOut } = useAuth();
 
   return (
-    <div className="bg-white shadow-sm border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+      <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <button
               type="button"
-              className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -22,7 +22,7 @@ export default function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <button className="p-2 text-gray-400 hover:text-gray-500 relative">
+            <button className="p-2 text-gray-400 hover:text-gray-500 relative transition-colors">
               <Bell className="h-6 w-6" />
               <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
             </button>
@@ -41,7 +41,7 @@ export default function Header() {
               </div>
               <button
                 onClick={signOut}
-                className="p-2 text-gray-400 hover:text-gray-500"
+                className="p-2 text-gray-400 hover:text-gray-500 transition-colors"
                 title="Sign out"
               >
                 <LogOut className="h-5 w-5" />
