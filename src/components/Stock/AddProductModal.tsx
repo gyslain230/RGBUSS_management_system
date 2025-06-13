@@ -30,21 +30,48 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('products').insert([{
-        name: data.name,
-        price: data.price,
-        quantity: data.quantity,
-        category: data.category,
-        description: data.description,
-        status: user.role === 'admin' ? 'approved' : 'pending',
-        created_by: user.id,
-      }]);
+      // Create the product first
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .insert([{
+          name: data.name,
+          price: data.price,
+          quantity: data.quantity,
+          category: data.category,
+          description: data.description,
+          status: user.role === 'admin' ? 'approved' : 'pending',
+          created_by: user.id,
+        }])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (productError) throw productError;
+
+      // If product is approved and has quantity > 0, record it as a stock adjustment (entres)
+      if (productData && (user.role === 'admin' || user.role === 'manager') && data.quantity > 0) {
+        const { error: adjustmentError } = await supabase
+          .from('stock_adjustments')
+          .insert([{
+            product_id: productData.id,
+            product_name: data.name,
+            adjustment_type: 'increase',
+            quantity_adjusted: data.quantity,
+            previous_quantity: 0, // New product starts from 0
+            new_quantity: data.quantity,
+            reason: 'Initial stock entry for new product',
+            adjusted_by: user.id,
+            adjusted_by_name: user.full_name
+          }]);
+
+        if (adjustmentError) {
+          console.error('Error recording stock adjustment:', adjustmentError);
+          // Don't fail the product creation if adjustment recording fails
+        }
+      }
 
       toast.success(
         user.role === 'admin' 
-          ? 'Product added successfully!' 
+          ? `Product added successfully! ${data.quantity > 0 ? 'Initial stock recorded as entres.' : ''}` 
           : 'Product submitted for approval!'
       );
       
@@ -64,7 +91,12 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-md w-full p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900">Add New Product</h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Add New Product</h2>
+            <p className="text-sm text-blue-600 mt-1">
+              📊 Initial quantity will be recorded as "entres" in Daily Reports
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -110,13 +142,13 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Quantity
+                Initial Quantity
               </label>
               <input
                 type="number"
                 {...register('quantity', { 
                   required: 'Quantity is required',
-                  min: { value: 1, message: 'Quantity must be at least 1' }
+                  min: { value: 0, message: 'Quantity cannot be negative' }
                 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="0"
@@ -124,6 +156,9 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
               {errors.quantity && (
                 <p className="text-red-500 text-sm mt-1">{errors.quantity.message}</p>
               )}
+              <p className="text-xs text-blue-600 mt-1">
+                Will appear as "entres" in reports
+              </p>
             </div>
           </div>
 
@@ -159,6 +194,19 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter product description"
             />
+          </div>
+
+          {/* Information Box */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">📊 Daily Reports Integration</p>
+              <p>When you add this product with initial quantity, it will:</p>
+              <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                <li>Create the product in your inventory</li>
+                <li>Record the initial quantity as "entres" (new stock entries)</li>
+                <li>Appear in today's Daily Report with proper entres tracking</li>
+              </ul>
+            </div>
           </div>
 
           <div className="flex space-x-3 pt-4">
