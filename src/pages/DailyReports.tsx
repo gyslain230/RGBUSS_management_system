@@ -70,7 +70,6 @@ export default function DailyReports() {
         // Calculate sales for this product on the selected date
         const productSales = (sales || []).filter(sale => sale.product_id === product.id);
         const totalSold = productSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
-        const totalRevenue = productSales.reduce((sum, sale) => sum + sale.total_amount, 0);
 
         // Calculate values based on your business logic
         const entres = 0; // New stock entries for the day (you can modify this logic)
@@ -78,7 +77,7 @@ export default function DailyReports() {
         const sortie = totalSold; // Items sold (exit)
         const solde = product.quantity; // Current balance
         const pUnit1 = product.price; // Unit price
-        const pTotal = totalRevenue; // Total price from sales
+        const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
         const amavide = Math.max(0, product.quantity - 5); // Available minus minimum stock (5)
 
         return {
