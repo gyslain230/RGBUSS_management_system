@@ -37,14 +37,19 @@ export default function Layout({ children }: LayoutProps) {
   console.log('Layout: Rendering layout for user:', user.email, 'role:', user.role);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Fixed Sidebar */}
-      <Sidebar />
+    <div className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50">
+      {/* Sidebar - Fixed height, no scroll with page */}
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
       
-      {/* Main Content Area with Left Margin for Sidebar */}
-      <div className="md:ml-64 flex flex-col min-h-screen">
+      {/* Main Content Area */}
+      <div className="flex flex-col min-h-0">
+        {/* Header - Sticky at top of content area */}
         <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+        
+        {/* Main Content - Scrollable */}
+        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
           {children}
         </main>
       </div>
