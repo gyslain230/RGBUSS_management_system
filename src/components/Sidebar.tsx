@@ -6,7 +6,8 @@ import {
   ShoppingCart, 
   Users, 
   CreditCard,
-  Store
+  Store,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -28,6 +29,12 @@ const navigation = [
     href: '/sales',
     icon: ShoppingCart,
     roles: ['admin', 'manager', 'worker']
+  },
+  {
+    name: 'Daily Reports',
+    href: '/reports',
+    icon: FileText,
+    roles: ['admin', 'manager']
   },
   {
     name: 'User Management',

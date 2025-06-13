@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import StockManagement from './pages/StockManagement';
 import SalesManagement from './pages/SalesManagement';
+import DailyReports from './pages/DailyReports';
 import UserManagement from './pages/UserManagement';
 import CreditPanel from './pages/CreditPanel';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -71,6 +72,14 @@ function App() {
               </ProtectedRoute>
             } />
             
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <Layout>
+                  <DailyReports />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
             <Route path="/users" element={
               <ProtectedRoute>
                 <Layout>
@@ -88,10 +97,10 @@ function App() {
             } />
             
             {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/dashboard\" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
             {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/dashboard\" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </Router>
