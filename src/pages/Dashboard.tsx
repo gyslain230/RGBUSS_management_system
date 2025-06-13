@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, 
+  ShoppingCart, 
   Package, 
   TrendingUp,
   Download,
@@ -9,11 +10,14 @@ import {
   CreditCard,
   FileText,
   Calendar,
+  Clock,
   Shield,
+  Eye,
   BarChart3,
   PieChart as PieChartIcon,
   Activity,
-  Target
+  Target,
+  Zap
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -34,37 +38,63 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import MetricCard from '../components/Dashboard/MetricCard';
+import RecentSalesTable from '../components/Dashboard/RecentSalesTable';
 import StockAlerts from '../components/Dashboard/StockAlerts';
 import AIInsights from '../components/Dashboard/AIInsights';
 import toast from 'react-hot-toast';
 
 interface DashboardData {
+  revenueToday: number;
+  revenueYesterday: number;
+  revenueWeek: number;
+  revenueMonth: number;
+  salesToday: number;
+  salesYesterday: number;
+  salesWeek: number;
+  salesMonth: number;
   productsInStock: number;
   lowStockCount: number;
   totalRevenue: number;
   totalUsers: number;
   pendingCredits: number;
   overdueCredits: number;
+  salesOverview: any[];
+  recentSales: any[];
   stockAlerts: any[];
   creditAlerts: any[];
   categoryBreakdown: any[];
   topProducts: any[];
+  salesTrend: any[];
+  hourlyData: any[];
   previousReports: any[];
 }
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData>({
+    revenueToday: 0,
+    revenueYesterday: 0,
+    revenueWeek: 0,
+    revenueMonth: 0,
+    salesToday: 0,
+    salesYesterday: 0,
+    salesWeek: 0,
+    salesMonth: 0,
     productsInStock: 0,
     lowStockCount: 0,
     totalRevenue: 0,
     totalUsers: 0,
     pendingCredits: 0,
     overdueCredits: 0,
+    salesOverview: [],
+    recentSales: [],
     stockAlerts: [],
     creditAlerts: [],
     categoryBreakdown: [],
     topProducts: [],
+    salesTrend: [],
+    hourlyData: [],
     previousReports: []
   });
   const [dataLoading, setDataLoading] = useState(false);
@@ -108,13 +138,95 @@ export default function Dashboard() {
     );
   }
 
+  // Calculate P.Total for a given date range (Daily Reports logic)
+  const calculatePTotalForDateRange = async (startDate: string, endDate: string) => {
+    try {
+      // Get all approved products
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('status', 'approved');
+
+      if (productsError) throw productsError;
+
+      // Get all sales in the date range
+      const { data: sales, error: salesError } = await supabase
+        .from('sales')
+        .select('*')
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
+
+      if (salesError) throw salesError;
+
+      let totalPTotal = 0;
+
+      // Calculate P.Total for each product (same logic as Daily Reports)
+      (products || []).forEach(product => {
+        const entres = 0; // New stock entries
+        const totalJour = product.quantity + entres; // Total available for the day
+        const solde = product.quantity; // Current balance
+        const sortie = totalJour - solde; // Sortie = Total/Jour - Solde
+        const pUnit1 = product.price; // Unit price
+        const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
+        
+        totalPTotal += pTotal;
+      });
+
+      return totalPTotal;
+    } catch (error) {
+      console.error('Error calculating P.Total:', error);
+      return 0;
+    }
+  };
+
   const fetchDashboardData = async () => {
     setDataLoading(true);
     try {
       const today = new Date();
+      const yesterday = subDays(today, 1);
+      const weekStart = startOfWeek(today);
+      const monthStart = startOfMonth(today);
       
       const todayStart = startOfDay(today).toISOString();
       const todayEnd = endOfDay(today).toISOString();
+      const yesterdayStart = startOfDay(yesterday).toISOString();
+      const yesterdayEnd = endOfDay(yesterday).toISOString();
+      const weekStartISO = weekStart.toISOString();
+      const monthStartISO = monthStart.toISOString();
+
+      // Fetch all sales data
+      const { data: allSales, error: allSalesError } = await supabase
+        .from('sales')
+        .select('total_amount, quantity_sold, product_name, customer_name, created_at, product_id');
+
+      if (allSalesError) throw allSalesError;
+
+      // Calculate metrics
+      const todaySales = allSales?.filter(sale => 
+        sale.created_at >= todayStart && sale.created_at <= todayEnd
+      ) || [];
+      
+      const yesterdaySales = allSales?.filter(sale => 
+        sale.created_at >= yesterdayStart && sale.created_at <= yesterdayEnd
+      ) || [];
+      
+      const weekSales = allSales?.filter(sale => 
+        sale.created_at >= weekStartISO
+      ) || [];
+      
+      const monthSales = allSales?.filter(sale => 
+        sale.created_at >= monthStartISO
+      ) || [];
+
+      const revenueToday = todaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueYesterday = yesterdaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueWeek = weekSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueMonth = monthSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      
+      const salesToday = todaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesYesterday = yesterdaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesWeekCount = weekSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesMonthCount = monthSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
 
       // Calculate Total Revenue using P.Total logic from Daily Reports
       const totalRevenue = await calculatePTotalForDateRange('1970-01-01T00:00:00.000Z', new Date().toISOString());
@@ -149,6 +261,15 @@ export default function Dashboard() {
       const pendingCredits = credits?.filter(credit => credit.status === 'pending').length || 0;
       const overdueCredits = credits?.filter(credit => credit.status === 'overdue').length || 0;
 
+      // Fetch recent sales (last 10)
+      const { data: recentSales, error: recentSalesError } = await supabase
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (recentSalesError) throw recentSalesError;
+
       // Fetch stock alerts (products with quantity < 5)
       const { data: stockAlerts, error: stockAlertsError } = await supabase
         .from('products')
@@ -167,6 +288,48 @@ export default function Dashboard() {
 
       if (creditAlertsError) throw creditAlertsError;
 
+      // Generate sales overview for last 7 days
+      const salesOverview = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = subDays(today, i);
+        const dayStart = startOfDay(date).toISOString();
+        const dayEnd = endOfDay(date).toISOString();
+        
+        const daySales = allSales?.filter(sale => 
+          sale.created_at >= dayStart && sale.created_at <= dayEnd
+        ) || [];
+        
+        const dayRevenue = daySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+        const dayCount = daySales.length;
+
+        salesOverview.push({
+          date: format(date, 'MMM dd'),
+          revenue: dayRevenue,
+          sales: dayCount,
+          quantity: daySales.reduce((sum, sale) => sum + sale.quantity_sold, 0)
+        });
+      }
+
+      // Generate hourly data for today
+      const hourlyData = [];
+      for (let hour = 0; hour < 24; hour++) {
+        const hourStart = new Date(today);
+        hourStart.setHours(hour, 0, 0, 0);
+        const hourEnd = new Date(today);
+        hourEnd.setHours(hour, 59, 59, 999);
+        
+        const hourSales = todaySales.filter(sale => {
+          const saleTime = new Date(sale.created_at);
+          return saleTime >= hourStart && saleTime <= hourEnd;
+        });
+        
+        hourlyData.push({
+          hour: `${hour}:00`,
+          sales: hourSales.length,
+          revenue: hourSales.reduce((sum, sale) => sum + sale.total_amount, 0)
+        });
+      }
+
       // Generate category breakdown
       const categoryMap = new Map();
       const categoryRevenue = new Map();
@@ -180,6 +343,19 @@ export default function Dashboard() {
         }
       });
 
+      // Calculate revenue by category
+      allSales?.forEach(sale => {
+        const product = products?.find(p => p.id === sale.product_id);
+        if (product) {
+          const category = product.category;
+          if (categoryRevenue.has(category)) {
+            categoryRevenue.set(category, categoryRevenue.get(category) + sale.total_amount);
+          } else {
+            categoryRevenue.set(category, sale.total_amount);
+          }
+        }
+      });
+
       const categoryBreakdown = Array.from(categoryMap.entries()).map(([name, quantity]) => ({
         name,
         quantity,
@@ -187,12 +363,46 @@ export default function Dashboard() {
         color: `hsl(${Math.random() * 360}, 70%, 50%)`
       }));
 
-      // Generate mock top products
-      const topProducts = (products || []).slice(0, 5).map(product => ({
-        name: product.name,
-        quantity: Math.floor(Math.random() * 50) + 10,
-        revenue: Math.floor(Math.random() * 5000) + 1000
-      }));
+      // Generate top products
+      const productSales = new Map();
+      allSales?.forEach(sale => {
+        if (productSales.has(sale.product_name)) {
+          const existing = productSales.get(sale.product_name);
+          productSales.set(sale.product_name, {
+            ...existing,
+            quantity: existing.quantity + sale.quantity_sold,
+            revenue: existing.revenue + sale.total_amount
+          });
+        } else {
+          productSales.set(sale.product_name, {
+            name: sale.product_name,
+            quantity: sale.quantity_sold,
+            revenue: sale.total_amount
+          });
+        }
+      });
+
+      const topProducts = Array.from(productSales.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      // Generate sales trend for last 30 days
+      const salesTrend = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = subDays(today, i);
+        const dayStart = startOfDay(date).toISOString();
+        const dayEnd = endOfDay(date).toISOString();
+        
+        const daySales = allSales?.filter(sale => 
+          sale.created_at >= dayStart && sale.created_at <= dayEnd
+        ) || [];
+        
+        salesTrend.push({
+          date: format(date, 'MMM dd'),
+          revenue: daySales.reduce((sum, sale) => sum + sale.total_amount, 0),
+          sales: daySales.length
+        });
+      }
 
       // Generate mock previous reports
       const previousReports = Array.from({ length: 30 }, (_, i) => {
@@ -207,16 +417,28 @@ export default function Dashboard() {
       });
 
       setData({
+        revenueToday,
+        revenueYesterday,
+        revenueWeek,
+        revenueMonth,
+        salesToday,
+        salesYesterday,
+        salesWeek: salesWeekCount,
+        salesMonth: salesMonthCount,
         productsInStock,
         lowStockCount,
         totalRevenue, // Now calculated using P.Total logic
         totalUsers,
         pendingCredits,
         overdueCredits,
+        salesOverview,
+        recentSales: recentSales || [],
         stockAlerts: stockAlerts || [],
         creditAlerts: creditAlerts || [],
         categoryBreakdown,
         topProducts,
+        salesTrend,
+        hourlyData,
         previousReports
       });
     } catch (error) {
@@ -227,38 +449,6 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate P.Total for a given date range (Daily Reports logic)
-  const calculatePTotalForDateRange = async (startDate: string, endDate: string) => {
-    try {
-      // Get all approved products
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('status', 'approved');
-
-      if (productsError) throw productsError;
-
-      let totalPTotal = 0;
-
-      // Calculate P.Total for each product (same logic as Daily Reports)
-      (products || []).forEach(product => {
-        const entres = 0; // New stock entries
-        const totalJour = product.quantity + entres; // Total available for the day
-        const solde = product.quantity; // Current balance
-        const sortie = totalJour - solde; // Sortie = Total/Jour - Solde
-        const pUnit1 = product.price; // Unit price
-        const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
-        
-        totalPTotal += pTotal;
-      });
-
-      return totalPTotal;
-    } catch (error) {
-      console.error('Error calculating P.Total:', error);
-      return 0;
-    }
-  };
-
   const downloadTodaysReport = async () => {
     setDownloadingReport(true);
     try {
@@ -266,6 +456,8 @@ export default function Dashboard() {
       const reportData = {
         date: today,
         summary: {
+          revenue: data.revenueToday,
+          sales: data.salesToday,
           productsInStock: data.productsInStock,
           lowStockAlerts: data.lowStockCount,
           pendingCredits: data.pendingCredits,
@@ -273,10 +465,15 @@ export default function Dashboard() {
           totalRevenue: data.totalRevenue // Now matches P.Total calculation
         },
         details: {
+          recentSales: data.recentSales,
           stockAlerts: data.stockAlerts,
           creditAlerts: data.creditAlerts,
           topProducts: data.topProducts,
           categoryBreakdown: data.categoryBreakdown
+        },
+        trends: {
+          hourlyData: data.hourlyData,
+          salesOverview: data.salesOverview
         }
       };
 
@@ -324,6 +521,18 @@ export default function Dashboard() {
       console.error('Error downloading previous report:', error);
       toast.error('Error downloading report');
     }
+  };
+
+  const getRevenueChange = () => {
+    if (data.revenueYesterday === 0) return '+100%';
+    const change = ((data.revenueToday - data.revenueYesterday) / data.revenueYesterday) * 100;
+    return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+  };
+
+  const getSalesChange = () => {
+    if (data.salesYesterday === 0) return '+100%';
+    const change = ((data.salesToday - data.salesYesterday) / data.salesYesterday) * 100;
+    return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
   };
 
   // Show loading for data fetching
@@ -391,7 +600,41 @@ export default function Dashboard() {
 
       <div className="space-y-8">
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Revenue Today</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">${data.revenueToday.toLocaleString()}</p>
+                <p className={`text-sm mt-1 ${
+                  data.revenueToday >= data.revenueYesterday ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {getRevenueChange()} from yesterday
+                </p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <DollarSign className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Sales Today</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{data.salesToday}</p>
+                <p className={`text-sm mt-1 ${
+                  data.salesToday >= data.salesYesterday ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {getSalesChange()} from yesterday
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <ShoppingCart className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center justify-between">
               <div>
@@ -421,28 +664,23 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
 
-          {user.role === 'admin' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+        {/* Secondary Metrics */}
+        {user.role === 'admin' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Users</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{data.totalUsers}</p>
-                  <p className="text-sm mt-1 text-blue-600">
-                    System users
-                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{data.totalUsers}</p>
                 </div>
                 <div className="p-3 bg-cyan-100 rounded-lg">
                   <Users className="h-6 w-6 text-cyan-600" />
                 </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Secondary Metrics */}
-        {user.role === 'admin' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -470,6 +708,87 @@ export default function Dashboard() {
         )}
 
         {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Sales Trend Chart */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Sales Trend</h3>
+                <p className="text-sm text-gray-600">Last 7 days performance</p>
+              </div>
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={data.salesOverview}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  formatter={(value, name) => [
+                    name === 'revenue' ? `$${value}` : value,
+                    name === 'revenue' ? 'Revenue' : name === 'sales' ? 'Sales Count' : 'Quantity'
+                  ]}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#3B82F6" 
+                  fillOpacity={1} 
+                  fill="url(#colorRevenue)"
+                  strokeWidth={2}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="sales" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Hourly Sales Activity */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Today's Activity</h3>
+                <p className="text-sm text-gray-600">Hourly sales breakdown</p>
+              </div>
+              <Activity className="h-5 w-5 text-green-500" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.hourlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="hour" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Bar dataKey="sales" fill="#10B981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Category Breakdown and Top Products */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Category Breakdown */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -539,8 +858,52 @@ export default function Dashboard() {
         {/* AI Insights */}
         <AIInsights />
 
-        {/* Stock Alerts */}
-        <StockAlerts alerts={data.stockAlerts} />
+        {/* Tables and Alerts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Sales */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Recent Sales</h3>
+                <p className="text-sm text-gray-600">Latest transactions</p>
+              </div>
+              <ShoppingCart className="h-5 w-5 text-blue-500" />
+            </div>
+            
+            {data.recentSales.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p>No recent sales found</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Product</th>
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Amount</th>
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {data.recentSales.slice(0, 8).map((sale) => (
+                      <tr key={sale.id} className="hover:bg-gray-50">
+                        <td className="py-3 text-sm text-gray-900">{sale.product_name}</td>
+                        <td className="py-3 text-sm font-medium text-gray-900">${sale.total_amount}</td>
+                        <td className="py-3 text-sm text-gray-600">
+                          {format(new Date(sale.created_at), 'HH:mm')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Stock Alerts */}
+          <StockAlerts alerts={data.stockAlerts} />
+        </div>
 
         {/* Credit Alerts */}
         {data.creditAlerts.length > 0 && (

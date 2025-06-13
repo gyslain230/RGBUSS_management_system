@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
+  ShoppingCart, 
   Users, 
   CreditCard,
   Store,
@@ -21,6 +22,12 @@ const navigation = [
     name: 'Stock Management',
     href: '/stock',
     icon: Package,
+    roles: ['admin', 'manager', 'worker']
+  },
+  {
+    name: 'Sales Management',
+    href: '/sales',
+    icon: ShoppingCart,
     roles: ['admin', 'manager', 'worker']
   },
   {
