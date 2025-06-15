@@ -37,7 +37,7 @@ export interface Sale {
 
 export interface Credit {
   id: string;
-  sale_id: string;
+  sale_id: string | null;
   customer_name: string;
   amount: number;
   product_name: string;
@@ -103,6 +103,7 @@ class MockTable {
   }
 
   insert(data: any[]) {
+    console.log(`📝 INSERT operation on table: ${this.table}`, data);
     const items = this.getItems();
     const newItems = data.map(item => ({
       ...item,
@@ -113,6 +114,8 @@ class MockTable {
     
     items.push(...newItems);
     this.setItems(items);
+    console.log(`✅ Successfully inserted ${newItems.length} items into ${this.table}`);
+    console.log(`📊 Total items in ${this.table}:`, items.length);
     
     return {
       select: () => ({
@@ -179,55 +182,87 @@ class MockTable {
   }
 
   private getItems(): any[] {
-    const items = localStorage.getItem(this.table);
-    return items ? JSON.parse(items) : [];
+    try {
+      const items = localStorage.getItem(this.table);
+      const parsedItems = items ? JSON.parse(items) : [];
+      console.log(`📖 Reading from localStorage table: ${this.table}, found ${parsedItems.length} items`);
+      return parsedItems;
+    } catch (error) {
+      console.error(`❌ Error reading from localStorage table: ${this.table}`, error);
+      return [];
+    }
   }
 
   private setItems(items: any[]): void {
-    localStorage.setItem(this.table, JSON.stringify(items));
+    try {
+      localStorage.setItem(this.table, JSON.stringify(items));
+      console.log(`💾 Saved to localStorage table: ${this.table}, ${items.length} items`);
+    } catch (error) {
+      console.error(`❌ Error saving to localStorage table: ${this.table}`, error);
+    }
   }
 
   private executeQuery(): Promise<{ data: any[] | null; error: any }> {
     return new Promise((resolve) => {
       try {
+        console.log(`🔍 Executing query on table: ${this.table}`, this.query);
         let items = this.getItems();
 
         // Apply filters
         if (this.query.eq) {
+          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.eq.column] === this.query.eq.value);
+          console.log(`🔍 Filter eq(${this.query.eq.column}, ${this.query.eq.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.gt) {
+          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.gt.column] > this.query.gt.value);
+          console.log(`🔍 Filter gt(${this.query.gt.column}, ${this.query.gt.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.gte) {
+          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.gte.column] >= this.query.gte.value);
+          console.log(`🔍 Filter gte(${this.query.gte.column}, ${this.query.gte.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.lt) {
+          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.lt.column] < this.query.lt.value);
+          console.log(`🔍 Filter lt(${this.query.lt.column}, ${this.query.lt.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.lte) {
+          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.lte.column] <= this.query.lte.value);
+          console.log(`🔍 Filter lte(${this.query.lte.column}, ${this.query.lte.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         // Apply updates
         if (this.query.update && this.query.eq) {
-          items = items.map(item => {
+          console.log(`📝 UPDATE operation on table: ${this.table}`, this.query.update);
+          const originalItems = this.getItems();
+          const updatedItems = originalItems.map(item => {
             if (item[this.query.eq.column] === this.query.eq.value) {
-              return { ...item, ...this.query.update, updated_at: new Date().toISOString() };
+              const updatedItem = { ...item, ...this.query.update, updated_at: new Date().toISOString() };
+              console.log(`✏️ Updated item:`, updatedItem);
+              return updatedItem;
             }
             return item;
           });
-          this.setItems(items);
+          this.setItems(updatedItems);
+          items = updatedItems.filter(item => item[this.query.eq.column] === this.query.eq.value);
         }
 
         // Apply deletes
         if (this.query.delete && this.query.eq) {
-          items = items.filter(item => item[this.query.eq.column] !== this.query.eq.value);
-          this.setItems(items);
+          console.log(`🗑️ DELETE operation on table: ${this.table}`);
+          const originalItems = this.getItems();
+          const remainingItems = originalItems.filter(item => item[this.query.eq.column] !== this.query.eq.value);
+          this.setItems(remainingItems);
+          console.log(`🗑️ Deleted items, remaining: ${remainingItems.length}`);
+          items = [];
         }
 
         // Apply ordering
@@ -241,15 +276,19 @@ class MockTable {
             }
             return aVal > bVal ? 1 : -1;
           });
+          console.log(`📊 Ordered by ${this.query.order.column} (${this.query.order.ascending === false ? 'desc' : 'asc'})`);
         }
 
         // Apply limit
         if (this.query.limit) {
           items = items.slice(0, this.query.limit);
+          console.log(`📏 Limited to ${this.query.limit} items`);
         }
 
+        console.log(`✅ Query completed, returning ${items.length} items`);
         resolve({ data: items, error: null });
       } catch (error) {
+        console.error(`❌ Query error on table: ${this.table}`, error);
         resolve({ data: null, error });
       }
     });
@@ -260,30 +299,64 @@ export const supabase = new MockSupabaseClient();
 
 // Initialize with completely empty data for fresh restart
 const initializeData = () => {
-  console.log('🔄 Initializing fresh data - clearing all existing data...');
+  console.log('🔄 Initializing localStorage data structure...');
   
-  // Clear all existing data
-  localStorage.removeItem('products');
-  localStorage.removeItem('sales');
-  localStorage.removeItem('credits');
-  localStorage.removeItem('user_profiles');
-  localStorage.removeItem('stock_adjustments');
-  localStorage.removeItem('daily_reports');
+  // Define all required tables
+  const tables = [
+    'products',
+    'sales', 
+    'credits',
+    'user_profiles',
+    'stock_adjustments',
+    'daily_reports'
+  ];
+
+  // Initialize each table if it doesn't exist
+  tables.forEach(table => {
+    const existingData = localStorage.getItem(table);
+    if (!existingData) {
+      localStorage.setItem(table, JSON.stringify([]));
+      console.log(`📊 Initialized empty table: ${table}`);
+    } else {
+      const data = JSON.parse(existingData);
+      console.log(`📊 Table ${table} already exists with ${data.length} items`);
+    }
+  });
   
-  // Initialize with empty arrays - completely fresh start
-  localStorage.setItem('products', JSON.stringify([]));
-  localStorage.setItem('sales', JSON.stringify([]));
-  localStorage.setItem('credits', JSON.stringify([]));
-  localStorage.setItem('user_profiles', JSON.stringify([]));
-  localStorage.setItem('stock_adjustments', JSON.stringify([]));
-  localStorage.setItem('daily_reports', JSON.stringify([]));
+  console.log('✅ LocalStorage initialization complete');
   
-  console.log('✅ Fresh restart complete - all data cleared');
-  console.log('📊 Products: 0');
-  console.log('💰 Sales: 0');
-  console.log('📋 Stock Adjustments: 0');
-  console.log('📈 Daily Reports: 0');
+  // Log current state
+  tables.forEach(table => {
+    const data = JSON.parse(localStorage.getItem(table) || '[]');
+    console.log(`📈 ${table}: ${data.length} items`);
+  });
 };
 
 // Initialize data when module loads
 initializeData();
+
+// Export utility functions for debugging
+export const debugLocalStorage = () => {
+  console.log('🔍 LocalStorage Debug Information:');
+  const tables = ['products', 'sales', 'credits', 'user_profiles', 'stock_adjustments', 'daily_reports'];
+  
+  tables.forEach(table => {
+    const data = JSON.parse(localStorage.getItem(table) || '[]');
+    console.log(`📊 ${table}:`, data.length, 'items');
+    if (data.length > 0) {
+      console.log(`   Latest item:`, data[data.length - 1]);
+    }
+  });
+};
+
+export const clearAllData = () => {
+  console.log('🧹 Clearing all localStorage data...');
+  const tables = ['products', 'sales', 'credits', 'user_profiles', 'stock_adjustments', 'daily_reports'];
+  
+  tables.forEach(table => {
+    localStorage.removeItem(table);
+    localStorage.setItem(table, JSON.stringify([]));
+  });
+  
+  console.log('✅ All data cleared and reinitialized');
+};

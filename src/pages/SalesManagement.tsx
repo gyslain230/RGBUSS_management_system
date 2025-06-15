@@ -25,6 +25,7 @@ export default function SalesManagement() {
 
   const fetchProducts = async () => {
     try {
+      console.log('🔍 Fetching products from localStorage...');
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -32,6 +33,7 @@ export default function SalesManagement() {
         .order('name');
 
       if (error) throw error;
+      console.log('📦 Found products:', data?.length || 0);
       setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -121,10 +123,15 @@ export default function SalesManagement() {
 
     setSubmitting(true);
     try {
+      console.log('🚀 Starting solde submission process...');
+      console.log('📊 Processing', soldeEntries.length, 'solde entries');
+
       // Process each solde entry
       for (const entry of soldeEntries) {
         const currentQuantity = entry.product.quantity;
         const newSoldeQuantity = entry.soldeQuantity;
+        
+        console.log(`📦 Processing ${entry.product.name}: ${currentQuantity} → ${newSoldeQuantity}`);
         
         // Calculate the difference to determine adjustment type and quantity
         const difference = newSoldeQuantity - currentQuantity;
@@ -132,6 +139,8 @@ export default function SalesManagement() {
         if (difference !== 0) {
           const adjustmentType = difference > 0 ? 'increase' : 'decrease';
           const adjustmentQuantity = Math.abs(difference);
+
+          console.log(`📈 Creating ${adjustmentType} adjustment of ${adjustmentQuantity} for ${entry.product.name}`);
 
           // Update product quantity to match the solde
           const { error: updateError } = await supabase
@@ -143,26 +152,36 @@ export default function SalesManagement() {
             .eq('id', entry.product.id);
 
           if (updateError) throw updateError;
+          console.log(`✅ Updated product quantity for ${entry.product.name}`);
 
           // Record the stock adjustment for daily reports
+          const adjustmentData = {
+            product_id: entry.product.id,
+            product_name: entry.product.name,
+            adjustment_type: adjustmentType,
+            quantity_adjusted: adjustmentQuantity,
+            previous_quantity: currentQuantity,
+            new_quantity: newSoldeQuantity,
+            reason: 'Solde adjustment from Sales Management',
+            adjusted_by: user.id,
+            adjusted_by_name: user.full_name,
+            created_at: new Date().toISOString()
+          };
+
+          console.log('📝 Creating stock adjustment record:', adjustmentData);
+
           const { error: adjustmentError } = await supabase
             .from('stock_adjustments')
-            .insert([{
-              product_id: entry.product.id,
-              product_name: entry.product.name,
-              adjustment_type: adjustmentType,
-              quantity_adjusted: adjustmentQuantity,
-              previous_quantity: currentQuantity,
-              new_quantity: newSoldeQuantity,
-              reason: 'Solde adjustment from Sales Management',
-              adjusted_by: user.id,
-              adjusted_by_name: user.full_name
-            }]);
+            .insert([adjustmentData]);
 
           if (adjustmentError) throw adjustmentError;
+          console.log(`✅ Created stock adjustment record for ${entry.product.name}`);
+        } else {
+          console.log(`⚪ No change needed for ${entry.product.name} (same quantity)`);
         }
       }
 
+      console.log('🎉 All solde entries processed successfully!');
       toast.success(`Successfully updated solde for ${soldeEntries.length} products`);
       
       // Clear entries and refresh products
@@ -170,7 +189,7 @@ export default function SalesManagement() {
       await fetchProducts();
       
     } catch (error) {
-      console.error('Error submitting solde entries:', error);
+      console.error('❌ Error submitting solde entries:', error);
       toast.error('Error updating solde entries');
     } finally {
       setSubmitting(false);
@@ -201,7 +220,7 @@ export default function SalesManagement() {
           <h1 className="text-2xl font-bold text-gray-900">Sales Management</h1>
           <p className="text-gray-600">Manage product solde (stock balance) and update daily reports</p>
           <p className="text-sm text-blue-600 mt-1">
-            📊 Solde changes will be reflected in Daily Reports for all users
+            📊 Solde changes will be reflected in Daily Reports for all users • All data stored in localStorage
           </p>
         </div>
       </div>
@@ -458,14 +477,15 @@ export default function SalesManagement() {
           <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
           <div className="ml-3">
             <h3 className="text-sm font-medium text-blue-800">
-              How Solde Management Works
+              How Solde Management Works (LocalStorage)
             </h3>
             <div className="mt-2 text-sm text-blue-700">
               <ul className="list-disc list-inside space-y-1">
                 <li>Set the final stock quantity (solde) you want for each product</li>
                 <li>The system calculates the difference and creates appropriate stock adjustments</li>
-                <li>All changes are recorded and will appear in Daily Reports for all users</li>
+                <li>All changes are stored in localStorage and will appear in Daily Reports for all users</li>
                 <li>Positive changes create "increase" adjustments, negative changes create "decrease" adjustments</li>
+                <li>All data persists in your browser's localStorage</li>
               </ul>
             </div>
           </div>
