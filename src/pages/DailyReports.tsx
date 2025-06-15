@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, RefreshCw, Info, Package } from 'lucide-react';
+import { FileText, Download, Calendar, RefreshCw, Info, Package, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Product, Sale, StockAdjustment } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
@@ -26,6 +26,7 @@ export default function DailyReports() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [refreshing, setRefreshing] = useState(false);
   const [isFirstDay, setIsFirstDay] = useState(false);
+  const [adjustmentsFound, setAdjustmentsFound] = useState(0);
 
   useEffect(() => {
     fetchReportData();
@@ -63,6 +64,8 @@ export default function DailyReports() {
   const fetchReportData = async () => {
     setLoading(true);
     try {
+      console.log('🔍 Fetching report data for date:', selectedDate);
+      
       // Fetch all approved products
       const { data: products, error: productsError } = await supabase
         .from('products')
@@ -71,20 +74,28 @@ export default function DailyReports() {
         .order('name');
 
       if (productsError) throw productsError;
+      console.log('📦 Found products:', products?.length || 0);
 
-      // Fetch stock adjustments for the selected date
+      // Fetch stock adjustments for the selected date with broader time range
       const startOfDay = `${selectedDate}T00:00:00.000Z`;
       const endOfDay = `${selectedDate}T23:59:59.999Z`;
+
+      console.log('📅 Searching for adjustments between:', startOfDay, 'and', endOfDay);
 
       const { data: adjustments, error: adjustmentsError } = await supabase
         .from('stock_adjustments')
         .select('*')
         .gte('created_at', startOfDay)
-        .lte('created_at', endOfDay);
+        .lte('created_at', endOfDay)
+        .order('created_at', { ascending: false });
 
       if (adjustmentsError) throw adjustmentsError;
+      
+      console.log('📊 Found adjustments for selected date:', adjustments?.length || 0);
+      console.log('📊 Adjustments details:', adjustments);
+      setAdjustmentsFound(adjustments?.length || 0);
 
-      // Check if this is the first day with any stock adjustments
+      // Also fetch all adjustments to check if this is the first day
       const { data: allAdjustments, error: allAdjustmentsError } = await supabase
         .from('stock_adjustments')
         .select('created_at')
@@ -99,19 +110,27 @@ export default function DailyReports() {
       
       const isFirstDayEver = !firstAdjustmentDate || selectedDate <= firstAdjustmentDate;
       setIsFirstDay(isFirstDayEver);
+      console.log('🏁 Is first day:', isFirstDayEver);
 
       // Process data for each product
       const processedData: DailyReportData[] = await Promise.all(
         (products || []).map(async (product, index) => {
+          console.log(`🔄 Processing product: ${product.name} (ID: ${product.id})`);
+          
           // Get stock from previous day (0 if first day)
           const previousDayStock = isFirstDayEver ? 0 : await getPreviousDayStock(product.id, selectedDate);
+          console.log(`📈 Previous day stock for ${product.name}:`, previousDayStock);
           
           // Calculate stock adjustments (entres) for this product on the selected date
-          // This includes both manual adjustments AND new product entries
           const productAdjustments = (adjustments || []).filter(adj => adj.product_id === product.id);
+          console.log(`📊 Product adjustments for ${product.name}:`, productAdjustments);
+          
+          // Calculate entres (increases only)
           const entres = productAdjustments
             .filter(adj => adj.adjustment_type === 'increase')
             .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
+          
+          console.log(`📈 Entres for ${product.name}:`, entres);
 
           // Calculate values based on business logic
           const stock = previousDayStock; // Stock = previous day's solde
@@ -125,11 +144,15 @@ export default function DailyReports() {
           const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
           const amavide = Math.max(0, solde - 5); // Available minus minimum stock (5)
 
+          console.log(`📊 Calculated values for ${product.name}:`, {
+            stock, entres, totalJour, solde, sortie, pUnit1, pTotal, amavide
+          });
+
           return {
             no: index + 1,
             libelle: product.name,
-            stock, // Now based on previous day's solde
-            entres, // Calculated from actual stock adjustments (includes new product entries)
+            stock,
+            entres,
             totalJour,
             solde,
             sortie,
@@ -141,9 +164,10 @@ export default function DailyReports() {
         })
       );
 
+      console.log('✅ Final processed data:', processedData);
       setReportData(processedData);
     } catch (error) {
-      console.error('Error fetching report data:', error);
+      console.error('❌ Error fetching report data:', error);
       toast.error('Error loading report data');
     } finally {
       setLoading(false);
@@ -162,6 +186,7 @@ export default function DailyReports() {
       const reportContent = {
         date: selectedDate,
         isFirstDay,
+        adjustmentsFound,
         generatedAt: new Date().toISOString(),
         generatedBy: user?.full_name,
         data: reportData,
@@ -173,7 +198,7 @@ export default function DailyReports() {
           totalRevenue: reportData.reduce((sum, item) => sum + item.pTotal, 0)
         },
         note: isFirstDay ? 'This is the first day - stock values are 0 as there is no previous day data' : 'Stock values based on previous day\'s solde',
-        entresNote: 'Entres include new product entries and stock adjustments'
+        entresNote: 'Entres include new product entries and stock adjustments from Sales Management'
       };
 
       const blob = new Blob([JSON.stringify(reportContent, null, 2)], { type: 'application/json' });
@@ -212,6 +237,10 @@ export default function DailyReports() {
             <p className="text-sm text-green-600">
               📊 Stock = Previous day's solde • Entres = New products + Stock adjustments
             </p>
+            <span className="text-gray-300">•</span>
+            <p className="text-sm text-blue-600">
+              📈 {adjustmentsFound} adjustments found for {selectedDate}
+            </p>
           </div>
         </div>
         
@@ -245,6 +274,31 @@ export default function DailyReports() {
             <Download className="h-4 w-4 mr-2" />
             Export Report
           </button>
+        </div>
+      </div>
+
+      {/* Debug Information */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex">
+          <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-yellow-800">
+              Debug Information
+            </h3>
+            <div className="mt-2 text-sm text-yellow-700">
+              <p>
+                <strong>Selected Date:</strong> {selectedDate} | 
+                <strong> Adjustments Found:</strong> {adjustmentsFound} | 
+                <strong> Products:</strong> {reportData.length} | 
+                <strong> Total Entres:</strong> {reportData.reduce((sum, item) => sum + item.entres, 0)}
+              </p>
+              {adjustmentsFound === 0 && (
+                <p className="mt-1 text-yellow-600">
+                  ⚠️ No stock adjustments found for this date. Make sure you've submitted solde entries in Sales Management for today.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -283,6 +337,7 @@ export default function DailyReports() {
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li>Initial quantities when adding new products</li>
                 <li>Stock increases from inventory adjustments</li>
+                <li>Solde adjustments from Sales Management (increase type only)</li>
                 <li>New stock received from suppliers</li>
               </ul>
             </div>
@@ -329,6 +384,7 @@ export default function DailyReports() {
               <p className="text-sm text-gray-600">
                 Generated by {user?.full_name} • {reportData.length} products
                 {isFirstDay && <span className="text-blue-600 ml-2">• First Day</span>}
+                {adjustmentsFound > 0 && <span className="text-green-600 ml-2">• {adjustmentsFound} adjustments</span>}
               </p>
             </div>
             <FileText className="h-6 w-6 text-blue-600" />
