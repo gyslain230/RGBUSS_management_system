@@ -83,6 +83,18 @@ interface RecentSortieEntry {
   adjustment_date: string;
 }
 
+interface PreviousReport {
+  id: string;
+  date: string;
+  displayDate: string;
+  revenue: number;
+  sales: number;
+  entres: number;
+  hasData: boolean;
+  adjustmentCount: number;
+  creditCount: number;
+}
+
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData>({
@@ -359,6 +371,87 @@ export default function Dashboard() {
     }
   };
 
+  // Fetch real previous reports data
+  const fetchPreviousReports = async () => {
+    try {
+      console.log('📊 Fetching real previous reports data...');
+      
+      // Get all stock adjustments to find dates with activity
+      const { data: adjustments, error: adjustmentsError } = await supabase
+        .from('stock_adjustments')
+        .select('created_at');
+
+      if (adjustmentsError) throw adjustmentsError;
+
+      // Get all credits to find dates with credit activity
+      const { data: credits, error: creditsError } = await supabase
+        .from('credits')
+        .select('created_at, amount');
+
+      if (creditsError) throw creditsError;
+
+      // Get unique dates from both adjustments and credits
+      const adjustmentDates = (adjustments || []).map(adj => adj.created_at.split('T')[0]);
+      const creditDates = (credits || []).map(credit => credit.created_at.split('T')[0]);
+      const allDates = [...new Set([...adjustmentDates, ...creditDates])];
+
+      // Sort dates in descending order (most recent first)
+      const sortedDates = allDates.sort((a, b) => new Date(b).getTime() - new Date(a.getTime()));
+
+      // Generate previous reports for the last 30 days or available dates
+      const previousReports: PreviousReport[] = [];
+      const today = new Date();
+
+      // Check last 30 days for any activity
+      for (let i = 1; i <= 30; i++) {
+        const date = subDays(today, i);
+        const dateString = format(date, 'yyyy-MM-dd');
+        
+        // Check if this date has any activity
+        const hasAdjustments = adjustmentDates.includes(dateString);
+        const hasCredits = creditDates.includes(dateString);
+        const hasData = hasAdjustments || hasCredits;
+
+        if (hasData) {
+          // Calculate metrics for this date
+          const { totalPTotal, totalSortie, totalEntres } = await calculateDailyReportMetrics(dateString);
+          
+          // Count adjustments and credits for this date
+          const adjustmentCount = (adjustments || []).filter(adj => 
+            adj.created_at.split('T')[0] === dateString
+          ).length;
+          
+          const creditCount = (credits || []).filter(credit => 
+            credit.created_at.split('T')[0] === dateString
+          ).length;
+
+          previousReports.push({
+            id: `report-${dateString}`,
+            date: dateString,
+            displayDate: format(date, 'MMM dd, yyyy'),
+            revenue: totalPTotal,
+            sales: totalSortie,
+            entres: totalEntres,
+            hasData: true,
+            adjustmentCount,
+            creditCount
+          });
+        }
+      }
+
+      // Sort by date (most recent first) and limit to 20 reports
+      const sortedReports = previousReports
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 20);
+
+      console.log('📊 Previous reports found:', sortedReports.length);
+      return sortedReports;
+    } catch (error) {
+      console.error('Error fetching previous reports:', error);
+      return [];
+    }
+  };
+
   const fetchDashboardData = async () => {
     setDataLoading(true);
     try {
@@ -554,17 +647,8 @@ export default function Dashboard() {
         });
       }
 
-      // Generate mock previous reports
-      const previousReports = Array.from({ length: 30 }, (_, i) => {
-        const date = subDays(today, i + 1);
-        return {
-          id: `report-${i}`,
-          date: format(date, 'yyyy-MM-dd'),
-          displayDate: format(date, 'MMM dd, yyyy'),
-          revenue: Math.floor(Math.random() * 5000) + 1000,
-          sales: Math.floor(Math.random() * 50) + 10
-        };
-      });
+      // Fetch real previous reports data
+      const previousReports = await fetchPreviousReports();
 
       setData({
         revenueToday,
@@ -668,13 +752,47 @@ export default function Dashboard() {
     }
   };
 
-  const downloadPreviousReport = async (report: any) => {
+  const downloadPreviousReport = async (report: PreviousReport) => {
     try {
+      // Calculate detailed metrics for the specific date
+      const { totalPTotal, totalSortie, totalEntres } = await calculateDailyReportMetrics(report.date);
+      
+      // Get credits for this date
+      const startOfDay = `${report.date}T00:00:00.000Z`;
+      const endOfDay = `${report.date}T23:59:59.999Z`;
+      
+      const { data: dayCredits, error: creditsError } = await supabase
+        .from('credits')
+        .select('*')
+        .gte('created_at', startOfDay)
+        .lte('created_at', endOfDay);
+
+      if (creditsError) throw creditsError;
+
       const reportData = {
         date: report.date,
-        revenue: report.revenue,
-        sales: report.sales,
-        note: 'This is a sample previous report'
+        displayDate: report.displayDate,
+        metrics: {
+          revenue: totalPTotal,
+          sales: totalSortie,
+          entres: totalEntres,
+          adjustmentCount: report.adjustmentCount,
+          creditCount: report.creditCount
+        },
+        credits: dayCredits || [],
+        summary: {
+          totalCreditsAmount: (dayCredits || []).reduce((sum, credit) => sum + Number(credit.amount || 0), 0),
+          hasData: report.hasData,
+          dataTypes: {
+            hasAdjustments: report.adjustmentCount > 0,
+            hasCredits: report.creditCount > 0
+          }
+        },
+        metadata: {
+          generatedBy: user?.full_name,
+          generatedAt: new Date().toISOString(),
+          source: 'RGBUSS Dashboard - Real-time Daily Reports'
+        }
       };
 
       const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
@@ -1199,33 +1317,76 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Previous Reports Section */}
+        {/* Previous Reports Section - Now with Real Data */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Previous Reports</h3>
-              <p className="text-sm text-gray-600">Download historical business reports</p>
+              <p className="text-sm text-gray-600">Real-time historical Daily Reports data</p>
+              <p className="text-xs text-green-600 mt-1">
+                📊 Showing actual dates with stock adjustments and credits
+              </p>
             </div>
             <Calendar className="h-5 w-5 text-blue-500" />
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-            {data.previousReports.slice(0, 15).map((report) => (
-              <div key={report.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group">
-                <div>
-                  <p className="font-medium text-gray-900">{report.displayDate}</p>
-                  <p className="text-sm text-gray-600">Revenue: ${report.revenue.toLocaleString()}</p>
-                  <p className="text-sm text-gray-600">Sales: {report.sales}</p>
+          {data.previousReports.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p>No previous reports found</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Reports will appear here when you make stock adjustments or issue credits
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+              {data.previousReports.map((report) => (
+                <div key={report.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group">
+                  <div>
+                    <p className="font-medium text-gray-900">{report.displayDate}</p>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div>Revenue: ${report.revenue.toLocaleString()}</div>
+                      <div>Sales (Sortie): {report.sales}</div>
+                      <div>Entres: {report.entres}</div>
+                    </div>
+                    <div className="flex items-center space-x-2 mt-2">
+                      {report.adjustmentCount > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {report.adjustmentCount} adjustments
+                        </span>
+                      )}
+                      {report.creditCount > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          {report.creditCount} credits
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => downloadPreviousReport(report)}
+                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                    title="Download Report"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => downloadPreviousReport(report)}
-                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                  title="Download Report"
-                >
-                  <Download className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+
+          {/* Information about real-time data */}
+          <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+            <div className="text-sm text-green-800">
+              <p className="font-medium mb-1">📊 Real-Time Previous Reports</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Shows actual dates with stock adjustments or credit activity</li>
+                <li>Revenue = P.Total calculated from Daily Reports logic</li>
+                <li>Sales = Total Sortie from stock movements</li>
+                <li>Entres = Stock increases from Sales Management</li>
+                <li>Data automatically updates when new activities occur</li>
+                <li>Download includes detailed metrics and credit information</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
