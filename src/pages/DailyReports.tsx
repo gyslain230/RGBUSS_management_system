@@ -192,10 +192,10 @@ export default function DailyReports() {
         data: reportData,
         summary: {
           totalProducts: reportData.length,
-          totalStock: reportData.reduce((sum, item) => sum + item.stock, 0),
-          totalEntres: reportData.reduce((sum, item) => sum + item.entres, 0),
-          totalSorties: reportData.reduce((sum, item) => sum + item.sortie, 0),
-          totalRevenue: reportData.reduce((sum, item) => sum + item.pTotal, 0)
+          totalStock: reportData.reduce((sum, item) => sum + Number(item.stock), 0),
+          totalEntres: reportData.reduce((sum, item) => sum + Number(item.entres), 0),
+          totalSorties: reportData.reduce((sum, item) => sum + Number(item.sortie), 0),
+          totalRevenue: reportData.reduce((sum, item) => sum + Number(item.pTotal), 0)
         },
         note: isFirstDay ? 'This is the first day - stock values are 0 as there is no previous day data' : 'Stock values based on previous day\'s solde',
         entresNote: 'Entres include new product entries and stock adjustments from Sales Management'
@@ -217,6 +217,21 @@ export default function DailyReports() {
       toast.error('Error exporting report');
     }
   };
+
+  // Calculate totals with proper number conversion
+  const calculateTotals = () => {
+    return {
+      totalStock: reportData.reduce((sum, item) => sum + Number(item.stock || 0), 0),
+      totalEntres: reportData.reduce((sum, item) => sum + Number(item.entres || 0), 0),
+      totalJour: reportData.reduce((sum, item) => sum + Number(item.totalJour || 0), 0),
+      totalSolde: reportData.reduce((sum, item) => sum + Number(item.solde || 0), 0),
+      totalSortie: reportData.reduce((sum, item) => sum + Number(item.sortie || 0), 0),
+      totalPTotal: reportData.reduce((sum, item) => sum + Number(item.pTotal || 0), 0),
+      totalAmavide: reportData.reduce((sum, item) => sum + Number(item.amavide || 0), 0)
+    };
+  };
+
+  const totals = calculateTotals();
 
   if (loading) {
     return (
@@ -290,7 +305,7 @@ export default function DailyReports() {
                 <strong>Selected Date:</strong> {selectedDate} | 
                 <strong> Adjustments Found:</strong> {adjustmentsFound} | 
                 <strong> Products:</strong> {reportData.length} | 
-                <strong> Total Entres:</strong> {reportData.reduce((sum, item) => sum + item.entres, 0)}
+                <strong> Total Entres:</strong> {totals.totalEntres}
               </p>
               {adjustmentsFound === 0 && (
                 <p className="mt-1 text-yellow-600">
@@ -354,21 +369,21 @@ export default function DailyReports() {
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Stock</p>
           <p className="text-2xl font-bold text-blue-600">
-            {reportData.reduce((sum, item) => sum + item.stock, 0)}
+            {totals.totalStock}
           </p>
           {isFirstDay && <p className="text-xs text-blue-500">First day - all 0</p>}
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Entres</p>
           <p className="text-2xl font-bold text-green-600">
-            {reportData.reduce((sum, item) => sum + item.entres, 0)}
+            {totals.totalEntres}
           </p>
           <p className="text-xs text-green-500">New products + adjustments</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Revenue</p>
           <p className="text-2xl font-bold text-green-600">
-            ${reportData.reduce((sum, item) => sum + item.pTotal, 0).toFixed(2)}
+            ${totals.totalPTotal.toFixed(2)}
           </p>
         </div>
       </div>
@@ -485,7 +500,7 @@ export default function DailyReports() {
                 ))}
               </tbody>
               
-              {/* Summary Row */}
+              {/* Summary Row - Fixed Calculations */}
               <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                 <tr className="font-semibold">
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
@@ -496,29 +511,29 @@ export default function DailyReports() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                     <span className={isFirstDay ? 'text-blue-600' : ''}>
-                      {reportData.reduce((sum, item) => sum + item.stock, 0)}
+                      {totals.totalStock}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 border-r border-gray-200">
-                    {reportData.reduce((sum, item) => sum + item.entres, 0)}
+                    {totals.totalEntres}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                    {reportData.reduce((sum, item) => sum + item.totalJour, 0)}
+                    {totals.totalJour}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                    {reportData.reduce((sum, item) => sum + item.solde, 0)}
+                    {totals.totalSolde}
                   </td>
                   <td className="px-4 py-3 text-sm text-red-600 border-r border-gray-200">
-                    {reportData.reduce((sum, item) => sum + item.sortie, 0)}
+                    {totals.totalSortie}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                     -
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 border-r border-gray-200">
-                    ${reportData.reduce((sum, item) => sum + item.pTotal, 0).toFixed(2)}
+                    ${totals.totalPTotal.toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {reportData.reduce((sum, item) => sum + item.amavide, 0)}
+                    {totals.totalAmavide}
                   </td>
                 </tr>
               </tfoot>

@@ -63,6 +63,7 @@ interface DashboardData {
   totalCash: number;
   paidCreditsTotal: number;
   totalCreditsCount: number;
+  totalEntres: number; // Added for dashboard integration
   salesOverview: any[];
   recentSales: any[];
   stockAlerts: any[];
@@ -94,6 +95,7 @@ export default function Dashboard() {
     totalCash: 0,
     paidCreditsTotal: 0,
     totalCreditsCount: 0,
+    totalEntres: 0,
     salesOverview: [],
     recentSales: [],
     stockAlerts: [],
@@ -186,6 +188,24 @@ export default function Dashboard() {
     }
   };
 
+  // Calculate total entres from stock adjustments
+  const calculateTotalEntres = async () => {
+    try {
+      const { data: adjustments, error } = await supabase
+        .from('stock_adjustments')
+        .select('*')
+        .eq('adjustment_type', 'increase');
+
+      if (error) throw error;
+
+      const totalEntres = (adjustments || []).reduce((sum, adj) => sum + Number(adj.quantity_adjusted || 0), 0);
+      return totalEntres;
+    } catch (error) {
+      console.error('Error calculating total entres:', error);
+      return 0;
+    }
+  };
+
   const fetchDashboardData = async () => {
     setDataLoading(true);
     try {
@@ -225,18 +245,21 @@ export default function Dashboard() {
         sale.created_at >= monthStartISO
       ) || [];
 
-      const revenueToday = todaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
-      const revenueYesterday = yesterdaySales.reduce((sum, sale) => sum + sale.total_amount, 0);
-      const revenueWeek = weekSales.reduce((sum, sale) => sum + sale.total_amount, 0);
-      const revenueMonth = monthSales.reduce((sum, sale) => sum + sale.total_amount, 0);
+      const revenueToday = todaySales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0);
+      const revenueYesterday = yesterdaySales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0);
+      const revenueWeek = weekSales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0);
+      const revenueMonth = monthSales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0);
       
-      const salesToday = todaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
-      const salesYesterday = yesterdaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
-      const salesWeekCount = weekSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
-      const salesMonthCount = monthSales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+      const salesToday = todaySales.reduce((sum, sale) => sum + Number(sale.quantity_sold || 0), 0);
+      const salesYesterday = yesterdaySales.reduce((sum, sale) => sum + Number(sale.quantity_sold || 0), 0);
+      const salesWeekCount = weekSales.reduce((sum, sale) => sum + Number(sale.quantity_sold || 0), 0);
+      const salesMonthCount = monthSales.reduce((sum, sale) => sum + Number(sale.quantity_sold || 0), 0);
 
       // Calculate Total Revenue using P.Total logic from Daily Reports
       const totalRevenue = await calculatePTotalForDateRange('1970-01-01T00:00:00.000Z', new Date().toISOString());
+
+      // Calculate Total Entres from stock adjustments
+      const totalEntres = await calculateTotalEntres();
 
       // Fetch products data
       const { data: products, error: productsError } = await supabase
@@ -246,8 +269,8 @@ export default function Dashboard() {
 
       if (productsError) throw productsError;
 
-      const productsInStock = products?.reduce((sum, product) => sum + product.quantity, 0) || 0;
-      const lowStockCount = products?.filter(product => product.quantity < 5).length || 0;
+      const productsInStock = products?.reduce((sum, product) => sum + Number(product.quantity || 0), 0) || 0;
+      const lowStockCount = products?.filter(product => Number(product.quantity || 0) < 5).length || 0;
 
       // Fetch users count (admin only)
       let totalUsers = 0;
@@ -272,9 +295,9 @@ export default function Dashboard() {
         credit.status === 'pending' && credit.due_date < today_date
       ).length || 0;
       
-      // Calculate monetary values
+      // Calculate monetary values with proper number conversion
       const totalCash = credits?.filter(credit => credit.status === 'paid')
-        .reduce((sum, credit) => sum + credit.amount, 0) || 0;
+        .reduce((sum, credit) => sum + Number(credit.amount || 0), 0) || 0;
       const paidCreditsTotal = totalCash; // Same as totalCash
       const totalCreditsCount = credits?.length || 0;
 
@@ -316,14 +339,14 @@ export default function Dashboard() {
           sale.created_at >= dayStart && sale.created_at <= dayEnd
         ) || [];
         
-        const dayRevenue = daySales.reduce((sum, sale) => sum + sale.total_amount, 0);
+        const dayRevenue = daySales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0);
         const dayCount = daySales.length;
 
         salesOverview.push({
           date: format(date, 'MMM dd'),
           revenue: dayRevenue,
           sales: dayCount,
-          quantity: daySales.reduce((sum, sale) => sum + sale.quantity_sold, 0)
+          quantity: daySales.reduce((sum, sale) => sum + Number(sale.quantity_sold || 0), 0)
         });
       }
 
@@ -343,7 +366,7 @@ export default function Dashboard() {
         hourlyData.push({
           hour: `${hour}:00`,
           sales: hourSales.length,
-          revenue: hourSales.reduce((sum, sale) => sum + sale.total_amount, 0)
+          revenue: hourSales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0)
         });
       }
 
@@ -353,10 +376,11 @@ export default function Dashboard() {
       
       products?.forEach(product => {
         const category = product.category;
+        const quantity = Number(product.quantity || 0);
         if (categoryMap.has(category)) {
-          categoryMap.set(category, categoryMap.get(category) + product.quantity);
+          categoryMap.set(category, categoryMap.get(category) + quantity);
         } else {
-          categoryMap.set(category, product.quantity);
+          categoryMap.set(category, quantity);
         }
       });
 
@@ -365,10 +389,11 @@ export default function Dashboard() {
         const product = products?.find(p => p.id === sale.product_id);
         if (product) {
           const category = product.category;
+          const amount = Number(sale.total_amount || 0);
           if (categoryRevenue.has(category)) {
-            categoryRevenue.set(category, categoryRevenue.get(category) + sale.total_amount);
+            categoryRevenue.set(category, categoryRevenue.get(category) + amount);
           } else {
-            categoryRevenue.set(category, sale.total_amount);
+            categoryRevenue.set(category, amount);
           }
         }
       });
@@ -387,14 +412,14 @@ export default function Dashboard() {
           const existing = productSales.get(sale.product_name);
           productSales.set(sale.product_name, {
             ...existing,
-            quantity: existing.quantity + sale.quantity_sold,
-            revenue: existing.revenue + sale.total_amount
+            quantity: existing.quantity + Number(sale.quantity_sold || 0),
+            revenue: existing.revenue + Number(sale.total_amount || 0)
           });
         } else {
           productSales.set(sale.product_name, {
             name: sale.product_name,
-            quantity: sale.quantity_sold,
-            revenue: sale.total_amount
+            quantity: Number(sale.quantity_sold || 0),
+            revenue: Number(sale.total_amount || 0)
           });
         }
       });
@@ -416,7 +441,7 @@ export default function Dashboard() {
         
         salesTrend.push({
           date: format(date, 'MMM dd'),
-          revenue: daySales.reduce((sum, sale) => sum + sale.total_amount, 0),
+          revenue: daySales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0),
           sales: daySales.length
         });
       }
@@ -451,6 +476,7 @@ export default function Dashboard() {
         totalCash,
         paidCreditsTotal,
         totalCreditsCount,
+        totalEntres, // Added total entres
         salesOverview,
         recentSales: recentSales || [],
         stockAlerts: stockAlerts || [],
@@ -483,7 +509,8 @@ export default function Dashboard() {
           pendingCredits: data.pendingCredits,
           overdueCredits: data.overdueCredits,
           totalCash: data.totalCash,
-          totalRevenue: data.totalRevenue // Now matches P.Total calculation
+          totalRevenue: data.totalRevenue, // Now matches P.Total calculation
+          totalEntres: data.totalEntres // Added total entres
         },
         details: {
           recentSales: data.recentSales,
@@ -593,7 +620,7 @@ export default function Dashboard() {
               </p>
               <span className="text-gray-300">•</span>
               <p className="text-xs text-green-600 font-medium">
-                📊 Revenue synced with Daily Reports
+                📊 Revenue synced with Daily Reports • Total Entres: {data.totalEntres}
               </p>
             </div>
           </div>
@@ -738,12 +765,12 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Credits</p>
-                <p className="text-2xl font-bold text-blue-600">{data.totalCreditsCount}</p>
-                <p className="text-xs text-blue-500 mt-1">All credit records</p>
+                <p className="text-sm font-medium text-gray-600">Total Entres</p>
+                <p className="text-2xl font-bold text-blue-600">{data.totalEntres}</p>
+                <p className="text-xs text-blue-500 mt-1">Stock increases</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-blue-600" />
+                <Package className="h-6 w-6 text-blue-600" />
               </div>
             </div>
           </div>
