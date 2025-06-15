@@ -17,7 +17,7 @@ export default function SalesManagement() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [soldeQuantity, setSoldeQuantity] = useState<number>(0);
+  const [soldeQuantity, setSoldeQuantity] = useState<number | string>('');
 
   useEffect(() => {
     fetchProducts();
@@ -47,7 +47,14 @@ export default function SalesManagement() {
       return;
     }
 
-    if (soldeQuantity < 0) {
+    const soldeQty = Number(soldeQuantity);
+    
+    if (soldeQuantity === '' || isNaN(soldeQty)) {
+      toast.error('Please enter a valid quantity');
+      return;
+    }
+
+    if (soldeQty < 0) {
       toast.error('Solde quantity cannot be negative');
       return;
     }
@@ -64,7 +71,7 @@ export default function SalesManagement() {
     if (existingEntryIndex >= 0) {
       // Update existing entry
       const updatedEntries = [...soldeEntries];
-      updatedEntries[existingEntryIndex].soldeQuantity = soldeQuantity;
+      updatedEntries[existingEntryIndex].soldeQuantity = soldeQty;
       setSoldeEntries(updatedEntries);
       toast.success('Solde entry updated');
     } else {
@@ -72,15 +79,15 @@ export default function SalesManagement() {
       const newEntry: SoldeEntry = {
         id: Date.now().toString(),
         product: selectedProduct,
-        soldeQuantity: soldeQuantity
+        soldeQuantity: soldeQty
       };
       setSoldeEntries([...soldeEntries, newEntry]);
       toast.success('Solde entry added');
     }
 
-    // Reset form
+    // Reset form but keep products list intact
     setSelectedProductId('');
-    setSoldeQuantity(0);
+    setSoldeQuantity('');
   };
 
   const handleRemoveEntry = (entryId: string) => {
@@ -173,6 +180,11 @@ export default function SalesManagement() {
   const getTotalEntries = () => soldeEntries.length;
   const getTotalSoldeValue = () => soldeEntries.reduce((sum, entry) => sum + (entry.soldeQuantity * entry.product.price), 0);
 
+  // Get available products (exclude those already in entries)
+  const availableProducts = products.filter(product => 
+    !soldeEntries.some(entry => entry.product.id === product.id)
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -189,7 +201,7 @@ export default function SalesManagement() {
           <h1 className="text-2xl font-bold text-gray-900">Sales Management</h1>
           <p className="text-gray-600">Manage product solde (stock balance) and update daily reports</p>
           <p className="text-sm text-blue-600 mt-1">
-            📊 Solde changes will be reflected in Daily Reports
+            📊 Solde changes will be reflected in Daily Reports for all users
           </p>
         </div>
       </div>
@@ -213,29 +225,34 @@ export default function SalesManagement() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Choose a product...</option>
-              {products.map((product) => (
+              {availableProducts.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.name} - Current: {product.quantity} - ${product.price}
                 </option>
               ))}
             </select>
+            {availableProducts.length === 0 && products.length > 0 && (
+              <p className="text-sm text-orange-600 mt-1">
+                All products have been added to solde entries
+              </p>
+            )}
           </div>
 
           {/* Solde Quantity Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Solde Quantity
+              New Solde Quantity
             </label>
             <input
               type="number"
               min="0"
               value={soldeQuantity}
-              onChange={(e) => setSoldeQuantity(Number(e.target.value))}
+              onChange={(e) => setSoldeQuantity(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter solde quantity"
+              placeholder="Enter new solde quantity"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Current stock balance to set
+              Set the final stock balance for this product
             </p>
           </div>
 
@@ -243,7 +260,7 @@ export default function SalesManagement() {
           <div className="flex items-end">
             <button
               onClick={handleAddSoldeEntry}
-              disabled={!selectedProductId}
+              disabled={!selectedProductId || soldeQuantity === ''}
               className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -259,7 +276,9 @@ export default function SalesManagement() {
               const selectedProduct = products.find(p => p.id === selectedProductId);
               if (!selectedProduct) return null;
               
-              const difference = soldeQuantity - selectedProduct.quantity;
+              const newSoldeQty = Number(soldeQuantity) || 0;
+              const difference = newSoldeQty - selectedProduct.quantity;
+              
               return (
                 <div className="text-sm">
                   <p className="font-medium text-blue-900 mb-1">Selected: {selectedProduct.name}</p>
@@ -270,7 +289,7 @@ export default function SalesManagement() {
                     </div>
                     <div>
                       <span className="text-blue-600">New Solde:</span>
-                      <span className="font-medium ml-1">{soldeQuantity}</span>
+                      <span className="font-medium ml-1">{newSoldeQty}</span>
                     </div>
                     <div>
                       <span className="text-blue-600">Change:</span>
@@ -278,6 +297,7 @@ export default function SalesManagement() {
                         difference > 0 ? 'text-green-600' : difference < 0 ? 'text-red-600' : 'text-gray-600'
                       }`}>
                         {difference > 0 ? '+' : ''}{difference}
+                        {difference > 0 ? ' (Increase)' : difference < 0 ? ' (Decrease)' : ' (No Change)'}
                       </span>
                     </div>
                   </div>
@@ -323,6 +343,9 @@ export default function SalesManagement() {
                     Change
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Adjustment Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Value
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -334,6 +357,7 @@ export default function SalesManagement() {
                 {soldeEntries.map((entry) => {
                   const difference = entry.soldeQuantity - entry.product.quantity;
                   const value = entry.soldeQuantity * entry.product.price;
+                  const adjustmentType = difference > 0 ? 'Increase' : difference < 0 ? 'Decrease' : 'No Change';
                   
                   return (
                     <tr key={entry.id} className="hover:bg-gray-50">
@@ -362,6 +386,15 @@ export default function SalesManagement() {
                           {difference > 0 ? '+' : ''}{difference}
                         </span>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          difference > 0 ? 'bg-green-100 text-green-800' : 
+                          difference < 0 ? 'bg-red-100 text-red-800' : 
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {adjustmentType}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${value.toFixed(2)}
                       </td>
@@ -387,7 +420,7 @@ export default function SalesManagement() {
               <div className="text-sm text-gray-600">
                 <p>Ready to submit {soldeEntries.length} solde entries</p>
                 <p className="text-xs text-blue-600">
-                  ⚠️ This will update product quantities and create stock adjustment records for Daily Reports
+                  ⚠️ This will update product quantities and create stock adjustment records for Daily Reports (visible to all users)
                 </p>
               </div>
               <button
@@ -410,14 +443,34 @@ export default function SalesManagement() {
             <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Solde Entries</h3>
             <p className="text-gray-600 mb-4">
-              Select products and add their solde quantities to get started
+              Select products and set their new solde quantities to get started
             </p>
             <p className="text-sm text-blue-600">
-              💡 Solde represents the current stock balance for each product
+              💡 Solde represents the final stock balance you want to set for each product
             </p>
           </div>
         </div>
       )}
+
+      {/* Information Panel */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex">
+          <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800">
+              How Solde Management Works
+            </h3>
+            <div className="mt-2 text-sm text-blue-700">
+              <ul className="list-disc list-inside space-y-1">
+                <li>Set the final stock quantity (solde) you want for each product</li>
+                <li>The system calculates the difference and creates appropriate stock adjustments</li>
+                <li>All changes are recorded and will appear in Daily Reports for all users</li>
+                <li>Positive changes create "increase" adjustments, negative changes create "decrease" adjustments</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
