@@ -437,46 +437,6 @@ export default function DailyReports() {
         doc.text('No credits found for this date', 20, currentY);
       }
 
-      // Section 3: Bottom right section (matching the image)
-      const rightSectionX = 130;
-      let rightSectionY = currentY - 40; // Position it higher to align with credits section
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.text('3.ROPORO Y\'AMAVIDE N\'IBIRAHURE', rightSectionX, rightSectionY);
-      rightSectionY += 8;
-
-      // Small table on the right
-      const rightColWidths = [20, 25, 25, 25];
-      const rightHeaders = ['AYATUWE', 'ATAMENETSE', 'UBUSOBANURO', 'IBIRAHURE'];
-      
-      // Header row for right section
-      doc.rect(rightSectionX, rightSectionY, rightColWidths.reduce((a, b) => a + b, 0), rowHeight);
-      currentX = rightSectionX;
-      
-      rightHeaders.forEach((header, index) => {
-        if (index > 0) {
-          doc.line(currentX, rightSectionY, currentX, rightSectionY + rowHeight);
-        }
-        doc.text(header, currentX + 1, rightSectionY + 4);
-        currentX += rightColWidths[index];
-      });
-      doc.line(currentX, rightSectionY, currentX, rightSectionY + rowHeight);
-      
-      // Add a few empty rows for the right section
-      for (let i = 0; i < 3; i++) {
-        rightSectionY += rowHeight;
-        doc.rect(rightSectionX, rightSectionY, rightColWidths.reduce((a, b) => a + b, 0), rowHeight);
-        currentX = rightSectionX;
-        rightColWidths.forEach((width, index) => {
-          if (index > 0) {
-            doc.line(currentX, rightSectionY, currentX, rightSectionY + rowHeight);
-          }
-          currentX += width;
-        });
-        doc.line(currentX, rightSectionY, currentX, rightSectionY + rowHeight);
-      }
-
       // Footer information
       const footerY = pageHeight - 30;
       doc.setFontSize(8);
