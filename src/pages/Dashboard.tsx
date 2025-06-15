@@ -75,6 +75,14 @@ interface DashboardData {
   previousReports: any[];
 }
 
+interface RecentSortieEntry {
+  id: string;
+  product_name: string;
+  sortie: number;
+  created_at: string;
+  adjustment_date: string;
+}
+
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData>({
@@ -265,6 +273,92 @@ export default function Dashboard() {
     }
   };
 
+  // Fetch recent sortie data from Daily Reports
+  const fetchRecentSortieData = async () => {
+    try {
+      console.log('📊 Fetching recent sortie data from Daily Reports...');
+      
+      // Get all approved products
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('status', 'approved');
+
+      if (productsError) throw productsError;
+
+      // Get recent stock adjustments (last 30 days)
+      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+      const { data: adjustments, error: adjustmentsError } = await supabase
+        .from('stock_adjustments')
+        .select('*')
+        .gte('created_at', thirtyDaysAgo)
+        .order('created_at', { ascending: false });
+
+      if (adjustmentsError) throw adjustmentsError;
+
+      // Group adjustments by date and product to calculate sortie
+      const sortieEntries: RecentSortieEntry[] = [];
+      const processedDates = new Set<string>();
+
+      // Get unique dates from adjustments
+      const uniqueDates = [...new Set((adjustments || []).map(adj => adj.created_at.split('T')[0]))];
+      
+      // Process each date (most recent first)
+      for (const dateString of uniqueDates.slice(0, 10)) { // Limit to last 10 dates
+        if (processedDates.has(dateString)) continue;
+        processedDates.add(dateString);
+
+        const startOfDay = `${dateString}T00:00:00.000Z`;
+        const endOfDay = `${dateString}T23:59:59.999Z`;
+
+        // Get adjustments for this specific date
+        const dayAdjustments = (adjustments || []).filter(adj => 
+          adj.created_at >= startOfDay && adj.created_at <= endOfDay
+        );
+
+        // Calculate sortie for each product on this date
+        (products || []).forEach(product => {
+          const productAdjustments = dayAdjustments.filter(adj => adj.product_id === product.id);
+          const entres = productAdjustments
+            .filter(adj => adj.adjustment_type === 'increase')
+            .reduce((sum, adj) => sum + Number(adj.quantity_adjusted || 0), 0);
+
+          // Daily Report calculation for sortie
+          const stock = 0; // Previous day stock (simplified)
+          const totalJour = stock + entres;
+          const solde = Number(product.quantity) || 0;
+          const sortie = totalJour - solde;
+
+          // Only include products with sortie > 0 (actual sales/outgoing stock)
+          if (sortie > 0) {
+            // Find the most recent adjustment for this product on this date for timestamp
+            const latestAdjustment = productAdjustments
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+            sortieEntries.push({
+              id: `${product.id}-${dateString}`,
+              product_name: product.name,
+              sortie: sortie,
+              created_at: latestAdjustment?.created_at || `${dateString}T12:00:00.000Z`,
+              adjustment_date: dateString
+            });
+          }
+        });
+      }
+
+      // Sort by most recent and limit to 10 entries
+      const recentSortieData = sortieEntries
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10);
+
+      console.log('📊 Recent sortie data:', recentSortieData);
+      return recentSortieData;
+    } catch (error) {
+      console.error('Error fetching recent sortie data:', error);
+      return [];
+    }
+  };
+
   const fetchDashboardData = async () => {
     setDataLoading(true);
     try {
@@ -372,14 +466,8 @@ export default function Dashboard() {
       const paidCreditsTotal = totalCash; // Same as totalCash
       const totalCreditsCount = credits?.length || 0;
 
-      // Fetch recent sales (last 10)
-      const { data: recentSales, error: recentSalesError } = await supabase
-        .from('sales')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (recentSalesError) throw recentSalesError;
+      // Fetch recent sortie data instead of traditional sales
+      const recentSales = await fetchRecentSortieData();
 
       // Fetch stock alerts (products with quantity < 5)
       const { data: stockAlerts, error: stockAlertsError } = await supabase
@@ -863,6 +951,7 @@ export default function Dashboard() {
                   <li><strong>Sales Today</strong> = Today's Total Sortie from Daily Reports</li>
                   <li><strong>Total Revenue</strong> = Sum of all Daily Report P.Totals</li>
                   <li><strong>Total Entres</strong> = All stock increases from Sales Management</li>
+                  <li><strong>Recent Sales</strong> = Recent sortie data with timestamps</li>
                   <li>Data refreshes automatically for next day's metrics</li>
                 </ul>
               </div>
@@ -1023,12 +1112,12 @@ export default function Dashboard() {
 
         {/* Tables and Alerts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Recent Sales */}
+          {/* Recent Sales - Now showing Sortie data */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Recent Sales</h3>
-                <p className="text-sm text-gray-600">Latest transactions</p>
+                <h3 className="text-lg font-semibold text-gray-900">Recent Sales (Sortie)</h3>
+                <p className="text-sm text-gray-600">Latest product sortie from Daily Reports</p>
               </div>
               <ShoppingCart className="h-5 w-5 text-blue-500" />
             </div>
@@ -1036,7 +1125,8 @@ export default function Dashboard() {
             {data.recentSales.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p>No recent sales found</p>
+                <p>No recent sortie found</p>
+                <p className="text-xs text-gray-400 mt-1">Sortie data will appear when stock adjustments are made</p>
               </div>
             ) : (
               <div className="overflow-hidden">
@@ -1044,22 +1134,38 @@ export default function Dashboard() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 text-sm font-medium text-gray-500">Product</th>
-                      <th className="text-left py-3 text-sm font-medium text-gray-500">Amount</th>
-                      <th className="text-left py-3 text-sm font-medium text-gray-500">Time</th>
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Sortie Qty</th>
+                      <th className="text-left py-3 text-sm font-medium text-gray-500">Date & Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {data.recentSales.slice(0, 8).map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50">
                         <td className="py-3 text-sm text-gray-900">{sale.product_name}</td>
-                        <td className="py-3 text-sm font-medium text-gray-900">${sale.total_amount}</td>
+                        <td className="py-3 text-sm font-medium text-red-600">{sale.sortie}</td>
                         <td className="py-3 text-sm text-gray-600">
-                          {format(new Date(sale.created_at), 'HH:mm')}
+                          <div>
+                            <div>{format(new Date(sale.created_at), 'MMM dd, yyyy')}</div>
+                            <div className="text-xs text-gray-500">
+                              {format(new Date(sale.created_at), 'HH:mm')}
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                
+                {/* Information about sortie data */}
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">📊 About Sortie Data</p>
+                    <p className="text-xs">
+                      Sortie represents products that left inventory (calculated as Total/Jour - Solde in Daily Reports).
+                      Timestamps show when stock adjustments were made in Sales Management.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
