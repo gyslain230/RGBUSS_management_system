@@ -88,9 +88,10 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-md w-full p-6">
-        <div className="flex items-center justify-between mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-xl w-full max-w-md mx-auto my-8 shadow-2xl max-h-[90vh] flex flex-col">
+        {/* Fixed Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white rounded-t-xl flex-shrink-0">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Add New Product</h2>
             <p className="text-sm text-blue-600 mt-1">
@@ -99,117 +100,123 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Product Name
-            </label>
-            <input
-              {...register('name', { required: 'Product name is required' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter product name"
-            />
-            {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Price ($)
+                Product Name
               </label>
               <input
-                type="number"
-                step="0.01"
-                {...register('price', { 
-                  required: 'Price is required',
-                  min: { value: 0.01, message: 'Price must be greater than 0' }
-                })}
+                {...register('name', { required: 'Product name is required' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0.00"
+                placeholder="Enter product name"
               />
-              {errors.price && (
-                <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
+              {errors.name && (
+                <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  {...register('price', { 
+                    required: 'Price is required',
+                    min: { value: 0.01, message: 'Price must be greater than 0' }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0.00"
+                />
+                {errors.price && (
+                  <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Initial Quantity
+                </label>
+                <input
+                  type="number"
+                  {...register('quantity', { 
+                    required: 'Quantity is required',
+                    min: { value: 0, message: 'Quantity cannot be negative' }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+                {errors.quantity && (
+                  <p className="text-red-500 text-sm mt-1">{errors.quantity.message}</p>
+                )}
+                <p className="text-xs text-blue-600 mt-1">
+                  Will appear as "entres" in reports
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category
+              </label>
+              <select
+                {...register('category', { required: 'Category is required' })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select category</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Clothing">Clothing</option>
+                <option value="Food & Beverages">Food & Beverages</option>
+                <option value="Home & Garden">Home & Garden</option>
+                <option value="Sports">Sports</option>
+                <option value="Books">Books</option>
+                <option value="Other">Other</option>
+              </select>
+              {errors.category && (
+                <p className="text-red-500 text-sm mt-1">{errors.category.message}</p>
               )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Initial Quantity
+                Description (Optional)
               </label>
-              <input
-                type="number"
-                {...register('quantity', { 
-                  required: 'Quantity is required',
-                  min: { value: 0, message: 'Quantity cannot be negative' }
-                })}
+              <textarea
+                {...register('description')}
+                rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
+                placeholder="Enter product description"
               />
-              {errors.quantity && (
-                <p className="text-red-500 text-sm mt-1">{errors.quantity.message}</p>
-              )}
-              <p className="text-xs text-blue-600 mt-1">
-                Will appear as "entres" in reports
-              </p>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select
-              {...register('category', { required: 'Category is required' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select category</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Clothing">Clothing</option>
-              <option value="Food & Beverages">Food & Beverages</option>
-              <option value="Home & Garden">Home & Garden</option>
-              <option value="Sports">Sports</option>
-              <option value="Books">Books</option>
-              <option value="Other">Other</option>
-            </select>
-            {errors.category && (
-              <p className="text-red-500 text-sm mt-1">{errors.category.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description (Optional)
-            </label>
-            <textarea
-              {...register('description')}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter product description"
-            />
-          </div>
-
-          {/* Information Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">📊 Daily Reports Integration</p>
-              <p>When you add this product with initial quantity, it will:</p>
-              <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
-                <li>Create the product in your inventory</li>
-                <li>Record the initial quantity as "entres" (new stock entries)</li>
-                <li>Appear in today's Daily Report with proper entres tracking</li>
-              </ul>
+            {/* Information Box */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">📊 Daily Reports Integration</p>
+                <p>When you add this product with initial quantity, it will:</p>
+                <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                  <li>Create the product in your inventory</li>
+                  <li>Record the initial quantity as "entres" (new stock entries)</li>
+                  <li>Appear in today's Daily Report with proper entres tracking</li>
+                </ul>
+              </div>
             </div>
-          </div>
+          </form>
+        </div>
 
-          <div className="flex space-x-3 pt-4">
+        {/* Fixed Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl flex-shrink-0">
+          <div className="flex space-x-3">
             <button
               type="button"
               onClick={onClose}
@@ -219,13 +226,14 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
             </button>
             <button
               type="submit"
+              onClick={handleSubmit(onSubmit)}
               disabled={loading}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Adding...' : 'Add Product'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
