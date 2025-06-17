@@ -370,14 +370,12 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     if (!existingProfile) {
       console.log('Profile not created by trigger, creating manually...');
       
-      // Create profile manually
+      // Create profile manually - let database handle timestamps
       const profileData = {
         id: authData.user.id,
         email: email,
         full_name: fullName,
-        role: role,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        role: role
       };
 
       console.log('Inserting profile data:', profileData);
