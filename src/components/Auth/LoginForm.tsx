@@ -150,6 +150,24 @@ export default function LoginForm() {
             </ul>
           </div>
         </div>
+
+        {/* Development credentials info */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="text-sm text-green-700">
+            <p className="font-medium mb-1">🔧 For Testing</p>
+            <p className="text-xs">
+              Create an account using the Register page, then sign in here.
+            </p>
+            <div className="mt-2">
+              <Link
+                to="/register"
+                className="text-green-600 hover:text-green-800 text-sm font-medium"
+              >
+                Go to Registration →
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
