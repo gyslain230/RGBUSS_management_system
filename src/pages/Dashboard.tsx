@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Package, ShoppingCart, CreditCard, TrendingUp, Users, Calendar, AlertTriangle } from 'lucide-react';
+import { DollarSign, Package, ShoppingCart, CreditCard, TrendingUp, Users, Calendar, AlertTriangle, Download, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Product, Sale, Credit, StockAdjustment } from '../lib/supabase';
-import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import MetricCard from '../components/Dashboard/MetricCard';
 import RecentSalesTable from '../components/Dashboard/RecentSalesTable';
 import StockAlerts from '../components/Dashboard/StockAlerts';
 import AIInsights from '../components/Dashboard/AIInsights';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// Extend jsPDF type to include autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -42,6 +51,20 @@ interface RecentSortie {
   adjustment_type: string;
 }
 
+interface DailyReportData {
+  no: number;
+  libelle: string;
+  stock: number;
+  entres: number;
+  totalJour: number;
+  solde: number;
+  sortie: number;
+  pUnit1: number;
+  pTotal: number;
+  amavide: number;
+  productId: string;
+}
+
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -61,6 +84,7 @@ export default function Dashboard() {
   const [stockAlerts, setStockAlerts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -85,7 +109,7 @@ export default function Dashboard() {
       };
 
       const [products, sales, credits, adjustments] = await Promise.all([
-        fetchWithFallback(supabase.from('products').select('*').eq('status', 'approved')),
+        fetchWithFallback(supabase.from('products').select('*')),
         fetchWithFallback(supabase.from('sales').select('*').order('created_at', { ascending: false })),
         fetchWithFallback(supabase.from('credits').select('*')),
         fetchWithFallback(supabase.from('stock_adjustments').select('*').order('created_at', { ascending: false }))
@@ -265,6 +289,350 @@ export default function Dashboard() {
     }
   };
 
+  const getPreviousDayStock = async (productId: string, currentDate: string) => {
+    try {
+      const previousDate = format(subDays(new Date(currentDate), 1), 'yyyy-MM-dd');
+      
+      // Check if there are any stock adjustments before the current date
+      const { data: historicalAdjustments, error } = await supabase
+        .from('stock_adjustments')
+        .select('*')
+        .eq('product_id', productId)
+        .lt('created_at', `${currentDate}T00:00:00.000Z`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      // If no historical adjustments exist, this is the first day - stock should be 0
+      if (!historicalAdjustments || historicalAdjustments.length === 0) {
+        return 0;
+      }
+
+      // Get the last known stock level from the most recent adjustment before current date
+      const lastAdjustment = historicalAdjustments[0];
+      return lastAdjustment.new_quantity;
+    } catch (error) {
+      console.error('Error getting previous day stock:', error);
+      return 0;
+    }
+  };
+
+  const generateDailyReport = async (reportType: 'today' | 'weekly' | 'monthly') => {
+    setDownloadingReport(reportType);
+    
+    try {
+      let startDate: Date;
+      let endDate: Date;
+      let reportTitle: string;
+
+      const today = new Date();
+
+      switch (reportType) {
+        case 'today':
+          startDate = startOfDay(today);
+          endDate = endOfDay(today);
+          reportTitle = `Daily Report - ${format(today, 'MMMM dd, yyyy')}`;
+          break;
+        case 'weekly':
+          startDate = startOfWeek(today, { weekStartsOn: 1 }); // Monday start
+          endDate = endOfWeek(today, { weekStartsOn: 1 });
+          reportTitle = `Weekly Report - ${format(startDate, 'MMM dd')} to ${format(endDate, 'MMM dd, yyyy')}`;
+          break;
+        case 'monthly':
+          startDate = startOfMonth(today);
+          endDate = endOfMonth(today);
+          reportTitle = `Monthly Report - ${format(today, 'MMMM yyyy')}`;
+          break;
+      }
+
+      // Fetch data for the period
+      const [products, adjustments, credits] = await Promise.all([
+        supabase.from('products').select('*').order('name'),
+        supabase.from('stock_adjustments').select('*')
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString())
+          .order('created_at', { ascending: false }),
+        supabase.from('credits').select('*')
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString())
+          .order('created_at', { ascending: false })
+      ]);
+
+      if (!products.data || !adjustments.data || !credits.data) {
+        throw new Error('Failed to fetch report data');
+      }
+
+      // Process data for each product
+      const reportData: DailyReportData[] = await Promise.all(
+        products.data.map(async (product, index) => {
+          // Get stock from previous day (0 if first day)
+          const previousDayStock = reportType === 'today' ? 
+            await getPreviousDayStock(product.id, format(startDate, 'yyyy-MM-dd')) : 0;
+          
+          // Calculate stock adjustments (entres) for this product in the period
+          const productAdjustments = adjustments.data.filter(adj => adj.product_id === product.id);
+          
+          // Calculate entres (increases only)
+          const entres = productAdjustments
+            .filter(adj => adj.adjustment_type === 'increase')
+            .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
+
+          // Calculate values based on business logic
+          const stock = previousDayStock; // Stock = previous day's solde
+          const totalJour = stock + entres; // Total available for the day
+          const solde = Number(product.quantity) || 0; // Current balance (end of day)
+          
+          // Sortie = Total/Jour - Solde
+          const sortie = totalJour - solde;
+          
+          const pUnit1 = Number(product.price) || 0; // Unit price
+          const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
+          const amavide = Math.max(0, solde - 5); // Available minus minimum stock (5)
+
+          return {
+            no: index + 1,
+            libelle: product.name,
+            stock,
+            entres,
+            totalJour,
+            solde,
+            sortie,
+            pUnit1,
+            pTotal,
+            amavide,
+            productId: product.id
+          };
+        })
+      );
+
+      // Generate PDF
+      const doc = new jsPDF('portrait', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      
+      // Header - Company Name and Title
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('BAR LE BON SAMARITAIN', 20, 20);
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(reportTitle, 20, 28);
+      
+      // Date range
+      doc.setFontSize(10);
+      doc.text(`Period: ${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`, 20, 36);
+
+      // Column headers for the main table
+      const startY = 45;
+      const rowHeight = 6;
+      const colWidths = [12, 45, 15, 15, 20, 15, 15, 18, 18, 15];
+      let currentX = 20;
+
+      // Draw table headers
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      
+      // Header row
+      doc.rect(20, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+      
+      const headers = ['No', 'LIBELLE', 'Stock', 'Entres', 'Total/Jour', 'Solde', 'Sortie', 'P.Unit 1', 'P.Total', 'Amavide'];
+      
+      currentX = 20;
+      headers.forEach((header, index) => {
+        if (index > 0) {
+          doc.line(currentX, startY, currentX, startY + rowHeight);
+        }
+        doc.text(header, currentX + 2, startY + 4);
+        currentX += colWidths[index];
+      });
+      
+      doc.line(currentX, startY, currentX, startY + rowHeight);
+
+      // Data rows
+      doc.setFont('helvetica', 'normal');
+      let currentY = startY + rowHeight;
+      
+      reportData.forEach((item) => {
+        doc.rect(20, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+        
+        currentX = 20;
+        const rowData = [
+          item.no.toString(),
+          item.libelle.substring(0, 20),
+          item.stock.toString(),
+          item.entres.toString(),
+          item.totalJour.toString(),
+          item.solde.toString(),
+          item.sortie.toString(),
+          item.pUnit1.toFixed(0),
+          item.pTotal.toFixed(0),
+          item.amavide.toString()
+        ];
+        
+        rowData.forEach((data, colIndex) => {
+          if (colIndex > 0) {
+            doc.line(currentX, currentY, currentX, currentY + rowHeight);
+          }
+          
+          const isNumber = colIndex > 1;
+          if (isNumber) {
+            doc.text(data, currentX + colWidths[colIndex] - 2, currentY + 4, { align: 'right' });
+          } else {
+            doc.text(data, currentX + 2, currentY + 4);
+          }
+          currentX += colWidths[colIndex];
+        });
+        
+        doc.line(currentX, currentY, currentX, currentY + rowHeight);
+        currentY += rowHeight;
+      });
+
+      // Total row
+      const totals = {
+        totalStock: reportData.reduce((sum, item) => sum + Number(item.stock || 0), 0),
+        totalEntres: reportData.reduce((sum, item) => sum + Number(item.entres || 0), 0),
+        totalJour: reportData.reduce((sum, item) => sum + Number(item.totalJour || 0), 0),
+        totalSolde: reportData.reduce((sum, item) => sum + Number(item.solde || 0), 0),
+        totalSortie: reportData.reduce((sum, item) => sum + Number(item.sortie || 0), 0),
+        totalPTotal: reportData.reduce((sum, item) => sum + Number(item.pTotal || 0), 0),
+        totalAmavide: reportData.reduce((sum, item) => sum + Number(item.amavide || 0), 0)
+      };
+
+      doc.setFont('helvetica', 'bold');
+      doc.rect(20, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+      
+      currentX = 20;
+      const totalRowData = [
+        'TOTAL',
+        '',
+        totals.totalStock.toString(),
+        totals.totalEntres.toString(),
+        totals.totalJour.toString(),
+        totals.totalSolde.toString(),
+        totals.totalSortie.toString(),
+        '',
+        totals.totalPTotal.toFixed(0),
+        totals.totalAmavide.toString()
+      ];
+      
+      totalRowData.forEach((data, colIndex) => {
+        if (colIndex > 0) {
+          doc.line(currentX, currentY, currentX, currentY + rowHeight);
+        }
+        
+        if (data) {
+          const isNumber = colIndex > 1 && colIndex !== 7;
+          if (isNumber) {
+            doc.text(data, currentX + colWidths[colIndex] - 2, currentY + 4, { align: 'right' });
+          } else {
+            doc.text(data, currentX + 2, currentY + 4);
+          }
+        }
+        currentX += colWidths[colIndex];
+      });
+      
+      doc.line(currentX, currentY, currentX, currentY + rowHeight);
+      currentY += rowHeight + 10;
+
+      // Credits section
+      if (credits.data.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('CREDITS (DETTE)', 20, currentY);
+        currentY += 8;
+
+        const creditColWidths = [15, 60, 25];
+        const creditHeaders = ['No', 'NOM ET PRENOM', 'MONTANT'];
+        
+        doc.setFontSize(8);
+        doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
+        currentX = 20;
+        
+        creditHeaders.forEach((header, index) => {
+          if (index > 0) {
+            doc.line(currentX, currentY, currentX, currentY + rowHeight);
+          }
+          doc.text(header, currentX + 2, currentY + 4);
+          currentX += creditColWidths[index];
+        });
+        doc.line(currentX, currentY, currentX, currentY + rowHeight);
+        currentY += rowHeight;
+
+        doc.setFont('helvetica', 'normal');
+        credits.data.forEach((credit, index) => {
+          doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
+          
+          currentX = 20;
+          const creditRowData = [
+            (index + 1).toString(),
+            credit.customer_name.substring(0, 25),
+            Number(credit.amount).toFixed(0)
+          ];
+          
+          creditRowData.forEach((data, colIndex) => {
+            if (colIndex > 0) {
+              doc.line(currentX, currentY, currentX, currentY + rowHeight);
+            }
+            
+            if (colIndex === 2) {
+              doc.text(data, currentX + creditColWidths[colIndex] - 2, currentY + 4, { align: 'right' });
+            } else {
+              doc.text(data, currentX + 2, currentY + 4);
+            }
+            currentX += creditColWidths[colIndex];
+          });
+          doc.line(currentX, currentY, currentX, currentY + rowHeight);
+          currentY += rowHeight;
+        });
+
+        // Credit total
+        doc.setFont('helvetica', 'bold');
+        const totalCreditAmount = credits.data.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
+        doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
+        
+        currentX = 20;
+        const creditTotalData = ['TOTAL', '', totalCreditAmount.toFixed(0)];
+        
+        creditTotalData.forEach((data, colIndex) => {
+          if (colIndex > 0) {
+            doc.line(currentX, currentY, currentX, currentY + rowHeight);
+          }
+          
+          if (data) {
+            if (colIndex === 2) {
+              doc.text(data, currentX + creditColWidths[colIndex] - 2, currentY + 4, { align: 'right' });
+            } else {
+              doc.text(data, currentX + 2, currentY + 4);
+            }
+          }
+          currentX += creditColWidths[colIndex];
+        });
+        doc.line(currentX, currentY, currentX, currentY + rowHeight);
+      }
+
+      // Footer
+      const footerY = pageHeight - 30;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`Generated by: ${user?.full_name}`, 20, footerY);
+      doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 20, footerY + 5);
+      doc.text('RGBUSS Business Management System', pageWidth - 20, footerY, { align: 'right' });
+
+      // Save the PDF
+      const fileName = `${reportType}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      doc.save(fileName);
+
+      toast.success(`${reportType.charAt(0).toUpperCase() + reportType.slice(1)} report downloaded successfully!`);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error(`Error generating ${reportType} report`);
+    } finally {
+      setDownloadingReport(null);
+    }
+  };
+
   // Show loading state while auth is loading
   if (authLoading) {
     return (
@@ -320,6 +688,91 @@ export default function Dashboard() {
           <div className="text-right">
             <p className="text-blue-100 text-sm">Today's Date</p>
             <p className="text-xl font-semibold">{format(new Date(), 'EEEE, MMMM do')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Daily Report Download Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Quick Report Downloads</h3>
+            <p className="text-sm text-gray-600">Generate and download daily reports for different periods</p>
+          </div>
+          <FileText className="h-6 w-6 text-blue-600" />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Today's Report */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-medium text-blue-900">Today's Report</h4>
+                <p className="text-sm text-blue-700">{format(new Date(), 'MMMM dd, yyyy')}</p>
+              </div>
+              <Calendar className="h-5 w-5 text-blue-600" />
+            </div>
+            <button
+              onClick={() => generateDailyReport('today')}
+              disabled={downloadingReport === 'today'}
+              className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloadingReport === 'today' ? 'Generating...' : 'Download Today'}
+            </button>
+          </div>
+
+          {/* Weekly Report */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-medium text-green-900">Weekly Report</h4>
+                <p className="text-sm text-green-700">
+                  {format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'MMM dd')} - {format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'MMM dd')}
+                </p>
+              </div>
+              <Calendar className="h-5 w-5 text-green-600" />
+            </div>
+            <button
+              onClick={() => generateDailyReport('weekly')}
+              disabled={downloadingReport === 'weekly'}
+              className="w-full inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloadingReport === 'weekly' ? 'Generating...' : 'Download Weekly'}
+            </button>
+          </div>
+
+          {/* Monthly Report */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-medium text-purple-900">Monthly Report</h4>
+                <p className="text-sm text-purple-700">{format(new Date(), 'MMMM yyyy')}</p>
+              </div>
+              <Calendar className="h-5 w-5 text-purple-600" />
+            </div>
+            <button
+              onClick={() => generateDailyReport('monthly')}
+              disabled={downloadingReport === 'monthly'}
+              className="w-full inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloadingReport === 'monthly' ? 'Generating...' : 'Download Monthly'}
+            </button>
+          </div>
+        </div>
+
+        {/* Report Information */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="text-sm text-gray-700">
+            <p className="font-medium mb-1">📋 Report Information</p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              <li><strong>Today:</strong> Complete daily report for current date with stock movements and credits</li>
+              <li><strong>Weekly:</strong> Consolidated report from Monday to Sunday of current week</li>
+              <li><strong>Monthly:</strong> Full month report with all transactions and stock changes</li>
+              <li>All reports include product inventory, stock adjustments, and credit transactions</li>
+            </ul>
           </div>
         </div>
       </div>
