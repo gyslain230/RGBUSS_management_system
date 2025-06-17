@@ -39,20 +39,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('AuthProvider: Checking for existing session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('AuthProvider: Error getting session:', error);
+          setLoading(false);
+          return;
+        }
         
         if (session?.user) {
-          console.log('AuthProvider: Found existing session');
-          const profile = await getCurrentUser();
-          if (profile) {
-            setUser(profile);
-            console.log('AuthProvider: User profile loaded:', profile.email, 'Role:', profile.role);
+          console.log('AuthProvider: Found existing session for user:', session.user.email);
+          try {
+            const profile = await getCurrentUser();
+            if (profile) {
+              setUser(profile);
+              console.log('AuthProvider: User profile loaded:', profile.email, 'Role:', profile.role);
+            } else {
+              console.log('AuthProvider: No profile found for authenticated user');
+            }
+          } catch (profileError) {
+            console.error('AuthProvider: Error loading user profile:', profileError);
           }
         } else {
-          console.log('AuthProvider: No existing session');
+          console.log('AuthProvider: No existing session found');
         }
       } catch (error) {
-        console.error('AuthProvider: Error getting initial session:', error);
+        console.error('AuthProvider: Error during initialization:', error);
       } finally {
         setLoading(false);
       }
@@ -65,15 +78,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('AuthProvider: Auth state changed:', event);
       
       if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await getCurrentUser();
-        if (profile) {
-          setUser(profile);
-          console.log('AuthProvider: User signed in:', profile.email);
+        console.log('AuthProvider: User signed in:', session.user.email);
+        try {
+          const profile = await getCurrentUser();
+          if (profile) {
+            setUser(profile);
+            console.log('AuthProvider: Profile loaded after sign in:', profile.email);
+          }
+        } catch (error) {
+          console.error('AuthProvider: Error loading profile after sign in:', error);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         console.log('AuthProvider: User signed out');
       }
+      
+      // Set loading to false after any auth state change
+      setLoading(false);
     });
 
     return () => {
@@ -98,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(profile);
       console.log('AuthProvider: Successfully signed in:', profile.email, 'Role:', profile.role);
-      toast.success(`Signed in successfully as ${profile.role}!`);
+      toast.success(`Welcome back, ${profile.full_name}!`);
     } catch (error: any) {
       console.error('AuthProvider: Sign in failed:', error);
       
@@ -140,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('AuthProvider: User created successfully');
-      toast.success('User created successfully!');
+      toast.success('Account created successfully! You can now sign in.');
     } catch (error: any) {
       console.error('AuthProvider: Sign up failed:', error);
       
@@ -186,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
   };
 
-  console.log('AuthProvider: Current state - User:', user?.email, 'Loading:', loading);
+  console.log('AuthProvider: Current state - User:', user?.email || 'None', 'Loading:', loading);
 
   return (
     <AuthContext.Provider value={value}>

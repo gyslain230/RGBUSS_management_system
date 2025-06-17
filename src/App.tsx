@@ -96,11 +96,11 @@ function App() {
               </ProtectedRoute>
             } />
             
-            {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {/* Default redirect - redirect to login instead of dashboard */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
             
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* Catch all route - redirect to login instead of dashboard */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>
       </Router>

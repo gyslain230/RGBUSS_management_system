@@ -10,8 +10,10 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { user, loading } = useAuth();
 
-  console.log('Layout: Rendering with user:', user, 'loading:', loading);
+  console.log('Layout: Rendering with user:', user?.email || 'None', 'loading:', loading);
 
+  // This component should only render when user is authenticated
+  // ProtectedRoute handles the authentication check
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -24,7 +26,7 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   if (!user) {
-    console.log('Layout: No user found, should redirect to login');
+    console.log('Layout: No user found, this should not happen in a protected route');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
