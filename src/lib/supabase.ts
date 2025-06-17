@@ -103,26 +103,32 @@ class MockTable {
   }
 
   insert(data: any[]) {
-    console.log(`📝 INSERT operation on table: ${this.table}`, data);
-    const items = this.getItems();
-    const newItems = data.map(item => ({
-      ...item,
-      id: item.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      created_at: item.created_at || new Date().toISOString(),
-      updated_at: item.updated_at || new Date().toISOString()
-    }));
-    
-    items.push(...newItems);
-    this.setItems(items);
-    console.log(`✅ Successfully inserted ${newItems.length} items into ${this.table}`);
-    console.log(`📊 Total items in ${this.table}:`, items.length);
-    
-    return {
-      select: () => ({
-        single: () => Promise.resolve({ data: newItems[0], error: null })
-      }),
-      then: (callback: any) => callback({ data: newItems, error: null })
-    };
+    try {
+      const items = this.getItems();
+      const newItems = data.map(item => ({
+        ...item,
+        id: item.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        created_at: item.created_at || new Date().toISOString(),
+        updated_at: item.updated_at || new Date().toISOString()
+      }));
+      
+      items.push(...newItems);
+      this.setItems(items);
+      
+      return {
+        select: () => ({
+          single: () => Promise.resolve({ data: newItems[0], error: null })
+        }),
+        then: (callback: any) => callback({ data: newItems, error: null })
+      };
+    } catch (error) {
+      return {
+        select: () => ({
+          single: () => Promise.resolve({ data: null, error })
+        }),
+        then: (callback: any) => callback({ data: null, error })
+      };
+    }
   }
 
   update(data: any) {
@@ -184,10 +190,9 @@ class MockTable {
   private getItems(): any[] {
     try {
       const items = localStorage.getItem(this.table);
-      const parsedItems = items ? JSON.parse(items) : [];
-      return parsedItems;
+      return items ? JSON.parse(items) : [];
     } catch (error) {
-      console.error(`❌ Error reading from localStorage table: ${this.table}`, error);
+      console.error(`Error reading from localStorage table: ${this.table}`, error);
       return [];
     }
   }
@@ -196,7 +201,7 @@ class MockTable {
     try {
       localStorage.setItem(this.table, JSON.stringify(items));
     } catch (error) {
-      console.error(`❌ Error saving to localStorage table: ${this.table}`, error);
+      console.error(`Error saving to localStorage table: ${this.table}`, error);
     }
   }
 
@@ -267,7 +272,7 @@ class MockTable {
 
         resolve({ data: items, error: null });
       } catch (error) {
-        console.error(`❌ Query error on table: ${this.table}`, error);
+        console.error(`Query error on table: ${this.table}`, error);
         resolve({ data: null, error });
       }
     });
@@ -278,8 +283,6 @@ export const supabase = new MockSupabaseClient();
 
 // Initialize with empty data structure
 const initializeData = () => {
-  console.log('🔄 Initializing localStorage data structure...');
-  
   const tables = [
     'products',
     'sales', 
@@ -293,11 +296,8 @@ const initializeData = () => {
     const existingData = localStorage.getItem(table);
     if (!existingData) {
       localStorage.setItem(table, JSON.stringify([]));
-      console.log(`📊 Initialized empty table: ${table}`);
     }
   });
-  
-  console.log('✅ LocalStorage initialization complete');
 };
 
 // Initialize data when module loads
@@ -305,12 +305,12 @@ initializeData();
 
 // Export utility functions for debugging
 export const debugLocalStorage = () => {
-  console.log('🔍 LocalStorage Debug Information:');
+  console.log('LocalStorage Debug Information:');
   const tables = ['products', 'sales', 'credits', 'user_profiles', 'stock_adjustments', 'daily_reports'];
   
   tables.forEach(table => {
     const data = JSON.parse(localStorage.getItem(table) || '[]');
-    console.log(`📊 ${table}:`, data.length, 'items');
+    console.log(`${table}:`, data.length, 'items');
     if (data.length > 0) {
       console.log(`   Latest item:`, data[data.length - 1]);
     }
@@ -318,7 +318,7 @@ export const debugLocalStorage = () => {
 };
 
 export const clearAllData = () => {
-  console.log('🧹 Clearing all localStorage data...');
+  console.log('Clearing all localStorage data...');
   const tables = ['products', 'sales', 'credits', 'user_profiles', 'stock_adjustments', 'daily_reports'];
   
   tables.forEach(table => {
@@ -326,5 +326,5 @@ export const clearAllData = () => {
     localStorage.setItem(table, JSON.stringify([]));
   });
   
-  console.log('✅ All data cleared and reinitialized');
+  console.log('All data cleared and reinitialized');
 };

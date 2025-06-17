@@ -43,7 +43,7 @@ interface RecentSortie {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalRevenue: 0,
     totalProducts: 0,
@@ -59,68 +59,75 @@ export default function Dashboard() {
   const [recentSales, setRecentSales] = useState<Sale[]>([]);
   const [recentSorties, setRecentSorties] = useState<RecentSortie[]>([]);
   const [stockAlerts, setStockAlerts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user && !authLoading) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const fetchDashboardData = async () => {
     try {
-      console.log('🔄 Fetching dashboard data...');
       setLoading(true);
+      setError(null);
 
-      // Fetch all data in parallel
-      const [
-        productsResult,
-        salesResult,
-        creditsResult,
-        adjustmentsResult
-      ] = await Promise.all([
-        supabase.from('products').select('*').eq('status', 'approved'),
-        supabase.from('sales').select('*').order('created_at', { ascending: false }),
-        supabase.from('credits').select('*'),
-        supabase.from('stock_adjustments').select('*').order('created_at', { ascending: false })
+      // Fetch all data with error handling
+      const fetchWithFallback = async (query: any, fallback: any[] = []) => {
+        try {
+          const result = await query;
+          return result.data || fallback;
+        } catch (err) {
+          console.warn('Query failed, using fallback:', err);
+          return fallback;
+        }
+      };
+
+      const [products, sales, credits, adjustments] = await Promise.all([
+        fetchWithFallback(supabase.from('products').select('*').eq('status', 'approved')),
+        fetchWithFallback(supabase.from('sales').select('*').order('created_at', { ascending: false })),
+        fetchWithFallback(supabase.from('credits').select('*')),
+        fetchWithFallback(supabase.from('stock_adjustments').select('*').order('created_at', { ascending: false }))
       ]);
 
-      const products = productsResult.data || [];
-      const sales = salesResult.data || [];
-      const credits = creditsResult.data || [];
-      const adjustments = adjustmentsResult.data || [];
-
-      console.log('📊 Data fetched:', {
-        products: products.length,
-        sales: sales.length,
-        credits: credits.length,
-        adjustments: adjustments.length
-      });
-
-      // Calculate metrics
+      // Calculate metrics safely
       const today = new Date();
       const todayStart = startOfDay(today);
       const todayEnd = endOfDay(today);
 
       // Today's data
-      const todaySales = sales.filter(sale => 
-        new Date(sale.created_at) >= todayStart && new Date(sale.created_at) <= todayEnd
-      );
-      const todayCreditsData = credits.filter(credit => 
-        new Date(credit.created_at) >= todayStart && new Date(credit.created_at) <= todayEnd
-      );
+      const todaySales = sales.filter(sale => {
+        try {
+          return new Date(sale.created_at) >= todayStart && new Date(sale.created_at) <= todayEnd;
+        } catch {
+          return false;
+        }
+      });
+
+      const todayCreditsData = credits.filter(credit => {
+        try {
+          return new Date(credit.created_at) >= todayStart && new Date(credit.created_at) <= todayEnd;
+        } catch {
+          return false;
+        }
+      });
 
       // Calculate today's sorties from stock adjustments
-      const todayAdjustments = adjustments.filter(adj => 
-        new Date(adj.created_at) >= todayStart && new Date(adj.created_at) <= todayEnd
-      );
+      const todayAdjustments = adjustments.filter(adj => {
+        try {
+          return new Date(adj.created_at) >= todayStart && new Date(adj.created_at) <= todayEnd;
+        } catch {
+          return false;
+        }
+      });
 
       // Calculate sorties based on daily report logic
       const todaySortiesTotal = calculateTodaySorties(products, todayAdjustments);
 
       // Recent sorties for display (last 10 adjustments that represent sorties)
       const recentSortiesData = todayAdjustments
-        .filter(adj => adj.adjustment_type === 'decrease') // Sorties are decreases
+        .filter(adj => adj.adjustment_type === 'decrease')
         .slice(0, 10)
         .map(adj => ({
           id: adj.id,
@@ -130,29 +137,29 @@ export default function Dashboard() {
           adjustment_type: adj.adjustment_type
         }));
 
-      // Calculate metrics
+      // Calculate metrics safely
       const calculatedMetrics: DashboardMetrics = {
-        totalRevenue: sales.reduce((sum, sale) => sum + sale.total_amount, 0),
+        totalRevenue: sales.reduce((sum, sale) => sum + (Number(sale.total_amount) || 0), 0),
         totalProducts: products.length,
         totalSales: sales.length,
-        pendingCredits: credits.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0),
-        lowStockCount: products.filter(p => p.quantity < 5).length,
-        todayRevenue: todaySales.reduce((sum, sale) => sum + sale.total_amount, 0),
-        todayCredits: todayCreditsData.reduce((sum, credit) => sum + credit.amount, 0),
+        pendingCredits: credits
+          .filter(c => c.status === 'pending')
+          .reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
+        lowStockCount: products.filter(p => (Number(p.quantity) || 0) < 5).length,
+        todayRevenue: todaySales.reduce((sum, sale) => sum + (Number(sale.total_amount) || 0), 0),
+        todayCredits: todayCreditsData.reduce((sum, credit) => sum + (Number(credit.amount) || 0), 0),
         todaySorties: todaySortiesTotal
       };
 
-      // Sales data for chart (last 7 days)
+      // Generate chart data safely
       const salesChartData = generateSalesChartData(sales);
-
-      // Category data for pie chart
       const categoryChartData = generateCategoryData(products);
 
       // Recent sales (last 10)
       const recentSalesData = sales.slice(0, 10);
 
       // Stock alerts (low stock products)
-      const stockAlertsData = products.filter(p => p.quantity < 5);
+      const stockAlertsData = products.filter(p => (Number(p.quantity) || 0) < 5);
 
       // Update state
       setMetrics(calculatedMetrics);
@@ -162,9 +169,9 @@ export default function Dashboard() {
       setRecentSorties(recentSortiesData);
       setStockAlerts(stockAlertsData);
 
-      console.log('✅ Dashboard data updated successfully');
     } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
+      console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data');
       toast.error('Error loading dashboard data');
     } finally {
       setLoading(false);
@@ -172,72 +179,130 @@ export default function Dashboard() {
   };
 
   const calculateTodaySorties = (products: Product[], todayAdjustments: StockAdjustment[]) => {
-    // Calculate total sorties based on daily report logic
-    // Sortie = Total/Jour - Solde for each product
-    let totalSorties = 0;
+    try {
+      let totalSorties = 0;
 
-    products.forEach(product => {
-      // Get today's adjustments for this product
-      const productAdjustments = todayAdjustments.filter(adj => adj.product_id === product.id);
-      
-      // Calculate entres (increases only)
-      const entres = productAdjustments
-        .filter(adj => adj.adjustment_type === 'increase')
-        .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
+      products.forEach(product => {
+        try {
+          // Get today's adjustments for this product
+          const productAdjustments = todayAdjustments.filter(adj => adj.product_id === product.id);
+          
+          // Calculate entres (increases only)
+          const entres = productAdjustments
+            .filter(adj => adj.adjustment_type === 'increase')
+            .reduce((sum, adj) => sum + (Number(adj.quantity_adjusted) || 0), 0);
 
-      // Get previous day stock (simplified - using 0 for now)
-      const stock = 0; // Previous day's solde
-      const totalJour = stock + entres; // Total available for the day
-      const solde = product.quantity; // Current balance
-      const sortie = Math.max(0, totalJour - solde); // Sortie calculation
+          // Get previous day stock (simplified - using 0 for now)
+          const stock = 0; // Previous day's solde
+          const totalJour = stock + entres; // Total available for the day
+          const solde = Number(product.quantity) || 0; // Current balance
+          const sortie = Math.max(0, totalJour - solde); // Sortie calculation
 
-      totalSorties += sortie;
-    });
+          totalSorties += sortie;
+        } catch (err) {
+          console.warn('Error calculating sortie for product:', product.name, err);
+        }
+      });
 
-    return totalSorties;
+      return totalSorties;
+    } catch (error) {
+      console.warn('Error calculating total sorties:', error);
+      return 0;
+    }
   };
 
   const generateSalesChartData = (sales: Sale[]): SalesData[] => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), i);
-      const dayStart = startOfDay(date);
-      const dayEnd = endOfDay(date);
-      
-      const daySales = sales.filter(sale => {
-        const saleDate = new Date(sale.created_at);
-        return saleDate >= dayStart && saleDate <= dayEnd;
-      });
+    try {
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = subDays(new Date(), i);
+        const dayStart = startOfDay(date);
+        const dayEnd = endOfDay(date);
+        
+        const daySales = sales.filter(sale => {
+          try {
+            const saleDate = new Date(sale.created_at);
+            return saleDate >= dayStart && saleDate <= dayEnd;
+          } catch {
+            return false;
+          }
+        });
 
-      return {
-        name: format(date, 'MMM dd'),
-        sales: daySales.length,
-        revenue: daySales.reduce((sum, sale) => sum + sale.total_amount, 0)
-      };
-    }).reverse();
+        return {
+          name: format(date, 'MMM dd'),
+          sales: daySales.length,
+          revenue: daySales.reduce((sum, sale) => sum + (Number(sale.total_amount) || 0), 0)
+        };
+      }).reverse();
 
-    return last7Days;
+      return last7Days;
+    } catch (error) {
+      console.warn('Error generating sales chart data:', error);
+      return [];
+    }
   };
 
   const generateCategoryData = (products: Product[]): CategoryData[] => {
-    const categoryMap = new Map<string, number>();
-    
-    products.forEach(product => {
-      const category = product.category;
-      categoryMap.set(category, (categoryMap.get(category) || 0) + product.quantity);
-    });
+    try {
+      const categoryMap = new Map<string, number>();
+      
+      products.forEach(product => {
+        try {
+          const category = product.category || 'Unknown';
+          const quantity = Number(product.quantity) || 0;
+          categoryMap.set(category, (categoryMap.get(category) || 0) + quantity);
+        } catch (err) {
+          console.warn('Error processing product for category data:', product.name, err);
+        }
+      });
 
-    return Array.from(categoryMap.entries()).map(([name, value]) => ({
-      name,
-      value
-    }));
+      return Array.from(categoryMap.entries()).map(([name, value]) => ({
+        name,
+        value
+      }));
+    } catch (error) {
+      console.warn('Error generating category data:', error);
+      return [];
+    }
   };
 
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while fetching data
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
+          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
         </div>
       </div>
     );
@@ -316,25 +381,34 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold text-gray-900">Stock by Category</h3>
             <Package className="h-5 w-5 text-green-500" />
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {categoryData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[300px] text-gray-500">
+              <div className="text-center">
+                <Package className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <p>No category data available</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
