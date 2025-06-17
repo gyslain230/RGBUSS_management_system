@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Trash2, Shield } from 'lucide-react';
-import { supabase, User } from '../lib/supabase';
+import { Users, Plus, Trash2, Shield, Phone } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/Users/AddUserModal';
 
+interface UserProfile {
+  id: string;
+  phone_number: string;
+  full_name: string;
+  role: 'admin' | 'manager' | 'worker';
+  created_at: string;
+  updated_at: string;
+}
+
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -20,7 +29,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -45,18 +54,17 @@ export default function UserManagement() {
     }
 
     try {
-      // Delete from auth first
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      if (authError) throw authError;
-
-      // Delete from user_profiles
+      // Delete from profiles table (this will cascade due to foreign key constraints)
       const { error: profileError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .delete()
         .eq('id', userId);
 
       if (profileError) throw profileError;
 
+      // Note: In a production environment, you would also need to delete the user from auth.users
+      // This requires admin privileges and should be done server-side
+      
       toast.success('User deleted successfully');
       fetchUsers();
     } catch (error) {
@@ -68,7 +76,7 @@ export default function UserManagement() {
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
       const { error } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .update({ role: newRole })
         .eq('id', userId);
 
@@ -107,6 +115,9 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">Manage user accounts and permissions</p>
+          <p className="text-sm text-blue-600 mt-1">
+            📱 Users authenticate with phone numbers and passwords
+          </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -139,7 +150,7 @@ export default function UserManagement() {
                     User
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
+                    Phone Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
@@ -170,8 +181,11 @@ export default function UserManagement() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {user.email}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Phone className="h-4 w-4 mr-2 text-gray-400" />
+                        {user.phone_number}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
@@ -217,6 +231,27 @@ export default function UserManagement() {
           }}
         />
       )}
+
+      {/* Information Panel */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex">
+          <Phone className="h-5 w-5 text-blue-400 mt-0.5" />
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800">
+              Phone Authentication System
+            </h3>
+            <div className="mt-2 text-sm text-blue-700">
+              <ul className="list-disc list-inside space-y-1">
+                <li>Users authenticate using phone numbers instead of email addresses</li>
+                <li>Phone numbers must include country codes (e.g., +1234567890)</li>
+                <li>Only administrators can create new user accounts</li>
+                <li>All user data is stored securely in Supabase database</li>
+                <li>Role-based access control is enforced at the database level</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -7,7 +7,8 @@ import {
   Users, 
   CreditCard,
   Store,
-  FileText
+  FileText,
+  Phone
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -108,6 +109,10 @@ export default function Sidebar() {
             <p className="text-sm font-medium text-gray-900 truncate">
               {user?.full_name}
             </p>
+            <div className="flex items-center text-xs text-gray-500">
+              <Phone className="h-3 w-3 mr-1" />
+              <span className="truncate">{user?.phone_number}</span>
+            </div>
             <p className="text-xs text-gray-500 capitalize">
               {user?.role}
             </p>

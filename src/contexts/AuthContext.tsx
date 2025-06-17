@@ -1,19 +1,21 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase, getCurrentUser, signInWithPhone, signUpWithPhone, signOut as supabaseSignOut } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface User {
   id: string;
-  email: string;
-  role: 'admin' | 'manager' | 'worker';
+  phone_number: string;
   full_name: string;
+  role: 'admin' | 'manager' | 'worker';
   created_at: string;
+  updated_at: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
+  signIn: (phone: string, password: string) => Promise<void>;
+  signUp: (phone: string, password: string, fullName: string, role: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -27,34 +29,6 @@ export function useAuth() {
   return context;
 }
 
-// Default test users for easy testing
-const DEFAULT_USERS = [
-  {
-    id: '1',
-    email: 'admin@test.com',
-    password: 'admin123',
-    full_name: 'Admin User',
-    role: 'admin' as const,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    email: 'manager@test.com',
-    password: 'manager123',
-    full_name: 'Manager User',
-    role: 'manager' as const,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '3',
-    email: 'worker@test.com',
-    password: 'worker123',
-    full_name: 'Worker User',
-    role: 'worker' as const,
-    created_at: new Date().toISOString()
-  }
-];
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,114 +36,130 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('AuthProvider: Initializing...');
     
-    try {
-      // Initialize default users in localStorage if they don't exist
-      const existingUsers = localStorage.getItem('users');
-      if (!existingUsers) {
-        console.log('AuthProvider: Creating default users');
-        localStorage.setItem('users', JSON.stringify(DEFAULT_USERS));
-      }
-
-      // Check for existing session
-      const currentUser = localStorage.getItem('currentUser');
-      console.log('AuthProvider: Checking for existing session:', currentUser);
-      
-      if (currentUser) {
-        try {
-          const parsedUser = JSON.parse(currentUser);
-          console.log('AuthProvider: Found existing user:', parsedUser);
-          setUser(parsedUser);
-        } catch (error) {
-          console.error('AuthProvider: Error parsing stored user:', error);
-          localStorage.removeItem('currentUser');
+    // Get initial session
+    const getInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          console.log('AuthProvider: Found existing session');
+          const profile = await getCurrentUser();
+          if (profile) {
+            setUser(profile);
+            console.log('AuthProvider: User profile loaded:', profile.phone_number, 'Role:', profile.role);
+          }
+        } else {
+          console.log('AuthProvider: No existing session');
         }
+      } catch (error) {
+        console.error('AuthProvider: Error getting initial session:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('AuthProvider: Initialization error:', error);
-    } finally {
-      setLoading(false);
-      console.log('AuthProvider: Initialization complete');
-    }
+    };
+
+    getInitialSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthProvider: Auth state changed:', event);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await getCurrentUser();
+        if (profile) {
+          setUser(profile);
+          console.log('AuthProvider: User signed in:', profile.phone_number);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        console.log('AuthProvider: User signed out');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (phone: string, password: string) => {
     try {
-      console.log('AuthProvider: Attempting to sign in with:', email);
+      console.log('AuthProvider: Attempting to sign in with phone:', phone);
       
-      // Get users from localStorage
-      const usersData = localStorage.getItem('users');
-      if (!usersData) {
-        throw new Error('No users found. Please create an account first.');
+      // Format phone number (ensure it starts with +)
+      const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+      
+      const { user: authUser } = await signInWithPhone(formattedPhone, password);
+      
+      if (!authUser) {
+        throw new Error('Authentication failed');
       }
 
-      const users = JSON.parse(usersData);
-      console.log('AuthProvider: Available users:', users.map((u: any) => ({ email: u.email, role: u.role })));
-      
-      const foundUser = users.find((u: any) => u.email === email && u.password === password);
-
-      if (!foundUser) {
-        throw new Error('Invalid email or password. Please check your credentials and try again.');
+      const profile = await getCurrentUser();
+      if (!profile) {
+        throw new Error('User profile not found');
       }
 
-      console.log('AuthProvider: User found:', foundUser);
-
-      // Create user object without password
-      const userWithoutPassword = {
-        id: foundUser.id,
-        email: foundUser.email,
-        full_name: foundUser.full_name,
-        role: foundUser.role,
-        created_at: foundUser.created_at
-      };
-
-      console.log('AuthProvider: Setting user:', userWithoutPassword);
-
-      // Store current user
-      localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword);
-
-      console.log('AuthProvider: Successfully signed in:', foundUser.email, 'Role:', foundUser.role);
-      toast.success(`Signed in successfully as ${foundUser.role}!`);
+      setUser(profile);
+      console.log('AuthProvider: Successfully signed in:', profile.phone_number, 'Role:', profile.role);
+      toast.success(`Signed in successfully as ${profile.role}!`);
     } catch (error: any) {
       console.error('AuthProvider: Sign in failed:', error);
-      toast.error(error.message || 'Login failed. Please try again.');
+      
+      // Handle specific Supabase auth errors
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid phone number or password. Please check your credentials and try again.';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your phone number before signing in.';
+      } else if (error.message?.includes('Too many requests')) {
+        errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       throw error;
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, role: string) => {
+  const signUp = async (phone: string, password: string, fullName: string, role: string) => {
     try {
-      console.log('AuthProvider: Attempting to sign up with:', email, role);
+      console.log('AuthProvider: Attempting to sign up with phone:', phone, 'role:', role);
       
-      // Get existing users
-      const usersData = localStorage.getItem('users') || '[]';
-      const users = JSON.parse(usersData);
+      // Format phone number (ensure it starts with +)
+      const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+      
+      const { user: authUser } = await signUpWithPhone(
+        formattedPhone, 
+        password, 
+        fullName, 
+        role as 'admin' | 'manager' | 'worker'
+      );
 
-      // Check if user already exists
-      const existingUser = users.find((u: any) => u.email === email);
-      if (existingUser) {
-        throw new Error('An account with this email already exists. Please sign in instead.');
+      if (!authUser) {
+        throw new Error('User creation failed');
       }
 
-      // Create new user
-      const newUser = {
-        id: Date.now().toString(),
-        email: email,
-        password: password,
-        full_name: fullName,
-        role: role as 'admin' | 'manager' | 'worker',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to users array
-      users.push(newUser);
-      localStorage.setItem('users', JSON.stringify(users));
-
       console.log('AuthProvider: User created successfully');
-      toast.success('Account created successfully! You can now sign in.');
+      toast.success('User created successfully!');
     } catch (error: any) {
       console.error('AuthProvider: Sign up failed:', error);
-      toast.error(error.message || 'Registration failed. Please try again.');
+      
+      // Handle specific Supabase auth errors
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.message?.includes('User already registered')) {
+        errorMessage = 'A user with this phone number already exists. Please sign in instead.';
+      } else if (error.message?.includes('Password should be at least')) {
+        errorMessage = 'Password must be at least 6 characters long.';
+      } else if (error.message?.includes('Invalid phone number')) {
+        errorMessage = 'Please enter a valid phone number with country code (e.g., +1234567890).';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       throw error;
     }
   };
@@ -177,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       console.log('AuthProvider: Signing out...');
-      localStorage.removeItem('currentUser');
+      await supabaseSignOut();
       setUser(null);
       console.log('AuthProvider: Successfully signed out');
       toast.success('Signed out successfully!');
@@ -196,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
   };
 
-  console.log('AuthProvider: Current state - User:', user, 'Loading:', loading);
+  console.log('AuthProvider: Current state - User:', user?.phone_number, 'Loading:', loading);
 
   return (
     <AuthContext.Provider value={value}>

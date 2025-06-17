@@ -1,12 +1,22 @@
-// Mock data storage using localStorage
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Database types
 export interface User {
   id: string;
-  email: string;
-  role: 'admin' | 'manager' | 'worker';
+  phone_number: string;
   full_name: string;
+  role: 'admin' | 'manager' | 'worker';
   created_at: string;
+  updated_at: string;
 }
 
 export interface Product {
@@ -45,6 +55,7 @@ export interface Credit {
   status: 'pending' | 'paid' | 'overdue';
   due_date: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface StockAdjustment {
@@ -69,262 +80,163 @@ export interface DailyReport {
   products_sold: number;
   created_at: string;
   report_data: any;
+  created_by: string;
 }
 
-// Mock Supabase client
-class MockSupabaseClient {
-  from(table: string) {
-    return new MockTable(table);
-  }
+// Auth helper functions
+export const getCurrentUser = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
-  auth = {
-    getSession: () => Promise.resolve({ data: { session: null } }),
-    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    signInWithPassword: () => Promise.resolve({ data: null, error: null }),
-    signUp: () => Promise.resolve({ data: null, error: null }),
-    signOut: () => Promise.resolve({ error: null }),
-    admin: {
-      deleteUser: () => Promise.resolve({ error: null })
-    }
-  };
-}
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
 
-class MockTable {
-  private table: string;
-  private query: any = {};
+  return profile;
+};
 
-  constructor(table: string) {
-    this.table = table;
-  }
+export const signInWithPhone = async (phone: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    phone,
+    password,
+  });
 
-  select(columns: string = '*') {
-    this.query.select = columns;
-    return this;
-  }
+  if (error) throw error;
+  return data;
+};
 
-  insert(data: any[]) {
+export const signUpWithPhone = async (phone: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
+  const { data, error } = await supabase.auth.signUp({
+    phone,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+        role: role,
+      },
+    },
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+};
+
+// Utility functions for data operations
+export const createProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  const { data, error } = await supabase
+    .from('products')
+    .insert([productData])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const updateProduct = async (id: string, updates: Partial<Product>) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const createSale = async (saleData: Omit<Sale, 'id' | 'created_at'>) => {
+  const { data, error } = await supabase
+    .from('sales')
+    .insert([saleData])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const createCredit = async (creditData: Omit<Credit, 'id' | 'created_at' | 'updated_at'>) => {
+  const { data, error } = await supabase
+    .from('credits')
+    .insert([creditData])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const updateCredit = async (id: string, updates: Partial<Credit>) => {
+  const { data, error } = await supabase
+    .from('credits')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const createStockAdjustment = async (adjustmentData: Omit<StockAdjustment, 'id' | 'created_at'>) => {
+  const { data, error } = await supabase
+    .from('stock_adjustments')
+    .insert([adjustmentData])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Debug functions
+export const debugDatabase = async () => {
+  console.log('Database Debug Information:');
+  
+  const tables = ['profiles', 'products', 'sales', 'credits', 'stock_adjustments', 'daily_reports'];
+  
+  for (const table of tables) {
     try {
-      const items = this.getItems();
-      const newItems = data.map(item => ({
-        ...item,
-        id: item.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        created_at: item.created_at || new Date().toISOString(),
-        updated_at: item.updated_at || new Date().toISOString()
-      }));
-      
-      items.push(...newItems);
-      this.setItems(items);
-      
-      return {
-        select: () => ({
-          single: () => Promise.resolve({ data: newItems[0], error: null })
-        }),
-        then: (callback: any) => callback({ data: newItems, error: null })
-      };
-    } catch (error) {
-      return {
-        select: () => ({
-          single: () => Promise.resolve({ data: null, error })
-        }),
-        then: (callback: any) => callback({ data: null, error })
-      };
-    }
-  }
-
-  update(data: any) {
-    this.query.update = data;
-    return this;
-  }
-
-  delete() {
-    this.query.delete = true;
-    return this;
-  }
-
-  eq(column: string, value: any) {
-    this.query.eq = { column, value };
-    return this;
-  }
-
-  gt(column: string, value: any) {
-    this.query.gt = { column, value };
-    return this;
-  }
-
-  gte(column: string, value: any) {
-    this.query.gte = { column, value };
-    return this;
-  }
-
-  lt(column: string, value: any) {
-    this.query.lt = { column, value };
-    return this;
-  }
-
-  lte(column: string, value: any) {
-    this.query.lte = { column, value };
-    return this;
-  }
-
-  order(column: string, options: any = {}) {
-    this.query.order = { column, ...options };
-    return this;
-  }
-
-  limit(count: number) {
-    this.query.limit = count;
-    return this;
-  }
-
-  single() {
-    return this.executeQuery().then(result => ({
-      ...result,
-      data: result.data?.[0] || null
-    }));
-  }
-
-  then(callback: any) {
-    return this.executeQuery().then(callback);
-  }
-
-  private getItems(): any[] {
-    try {
-      const items = localStorage.getItem(this.table);
-      return items ? JSON.parse(items) : [];
-    } catch (error) {
-      console.error(`Error reading from localStorage table: ${this.table}`, error);
-      return [];
-    }
-  }
-
-  private setItems(items: any[]): void {
-    try {
-      localStorage.setItem(this.table, JSON.stringify(items));
-    } catch (error) {
-      console.error(`Error saving to localStorage table: ${this.table}`, error);
-    }
-  }
-
-  private executeQuery(): Promise<{ data: any[] | null; error: any }> {
-    return new Promise((resolve) => {
-      try {
-        let items = this.getItems();
-
-        // Apply filters
-        if (this.query.eq) {
-          items = items.filter(item => item[this.query.eq.column] === this.query.eq.value);
+      const { data, error } = await supabase.from(table).select('*');
+      if (error) {
+        console.error(`Error fetching ${table}:`, error);
+      } else {
+        console.log(`${table}:`, data?.length || 0, 'items');
+        if (data && data.length > 0) {
+          console.log(`   Latest item:`, data[data.length - 1]);
         }
-
-        if (this.query.gt) {
-          items = items.filter(item => item[this.query.gt.column] > this.query.gt.value);
-        }
-
-        if (this.query.gte) {
-          items = items.filter(item => item[this.query.gte.column] >= this.query.gte.value);
-        }
-
-        if (this.query.lt) {
-          items = items.filter(item => item[this.query.lt.column] < this.query.lt.value);
-        }
-
-        if (this.query.lte) {
-          items = items.filter(item => item[this.query.lte.column] <= this.query.lte.value);
-        }
-
-        // Apply updates
-        if (this.query.update && this.query.eq) {
-          const originalItems = this.getItems();
-          const updatedItems = originalItems.map(item => {
-            if (item[this.query.eq.column] === this.query.eq.value) {
-              return { ...item, ...this.query.update, updated_at: new Date().toISOString() };
-            }
-            return item;
-          });
-          this.setItems(updatedItems);
-          items = updatedItems.filter(item => item[this.query.eq.column] === this.query.eq.value);
-        }
-
-        // Apply deletes
-        if (this.query.delete && this.query.eq) {
-          const originalItems = this.getItems();
-          const remainingItems = originalItems.filter(item => item[this.query.eq.column] !== this.query.eq.value);
-          this.setItems(remainingItems);
-          items = [];
-        }
-
-        // Apply ordering
-        if (this.query.order) {
-          items.sort((a, b) => {
-            const aVal = a[this.query.order.column];
-            const bVal = b[this.query.order.column];
-            
-            if (this.query.order.ascending === false) {
-              return bVal > aVal ? 1 : -1;
-            }
-            return aVal > bVal ? 1 : -1;
-          });
-        }
-
-        // Apply limit
-        if (this.query.limit) {
-          items = items.slice(0, this.query.limit);
-        }
-
-        resolve({ data: items, error: null });
-      } catch (error) {
-        console.error(`Query error on table: ${this.table}`, error);
-        resolve({ data: null, error });
       }
-    });
+    } catch (err) {
+      console.error(`Error with table ${table}:`, err);
+    }
   }
-}
-
-export const supabase = new MockSupabaseClient();
-
-// Initialize with empty data structure
-const initializeData = () => {
-  const tables = [
-    'products',
-    'sales', 
-    'credits',
-    'user_profiles',
-    'stock_adjustments',
-    'daily_reports'
-  ];
-
-  tables.forEach(table => {
-    const existingData = localStorage.getItem(table);
-    if (!existingData) {
-      localStorage.setItem(table, JSON.stringify([]));
-    }
-  });
 };
 
-// Initialize data when module loads
-initializeData();
-
-// Export utility functions for debugging
-export const debugLocalStorage = () => {
-  console.log('LocalStorage Debug Information:');
-  const tables = ['products', 'sales', 'credits', 'user_profiles', 'stock_adjustments', 'daily_reports'];
+export const clearAllData = async () => {
+  console.log('Clearing all database data...');
   
-  tables.forEach(table => {
-    const data = JSON.parse(localStorage.getItem(table) || '[]');
-    console.log(`${table}:`, data.length, 'items');
-    if (data.length > 0) {
-      console.log(`   Latest item:`, data[data.length - 1]);
+  const tables = ['daily_reports', 'stock_adjustments', 'credits', 'sales', 'products'];
+  
+  for (const table of tables) {
+    try {
+      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) {
+        console.error(`Error clearing ${table}:`, error);
+      } else {
+        console.log(`Cleared ${table}`);
+      }
+    } catch (err) {
+      console.error(`Error clearing table ${table}:`, err);
     }
-  });
-};
-
-export const clearAllData = () => {
-  console.log('Clearing all localStorage data...');
-  const tables = ['products', 'sales', 'credits', 'user_profiles', 'stock_adjustments', 'daily_reports'];
+  }
   
-  tables.forEach(table => {
-    localStorage.removeItem(table);
-    localStorage.setItem(table, JSON.stringify([]));
-  });
-  
-  console.log('All data cleared and reinitialized');
+  console.log('All data cleared');
 };

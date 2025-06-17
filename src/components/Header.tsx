@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell, LogOut } from 'lucide-react';
+import { Menu, Bell, LogOut, Phone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Header() {
@@ -37,7 +37,10 @@ export default function Header() {
               </div>
               <div className="hidden md:block">
                 <div className="text-sm font-medium text-gray-900">{user?.full_name}</div>
-                <div className="text-xs text-gray-500 capitalize">{user?.role}</div>
+                <div className="text-xs text-gray-500 flex items-center">
+                  <Phone className="h-3 w-3 mr-1" />
+                  {user?.phone_number} • {user?.role}
+                </div>
               </div>
               <button
                 onClick={signOut}
