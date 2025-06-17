@@ -193,7 +193,7 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
   }
 
   try {
-    console.log('Creating user account for:', email);
+    console.log('Creating user account for:', email, 'with role:', role);
     
     // Create the auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -209,19 +209,19 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
 
     if (authError) {
       console.error('Auth signup error:', authError);
-      throw authError;
+      throw new Error(`Authentication error: ${authError.message}`);
     }
 
     if (!authData.user) {
-      throw new Error('User creation failed - no user returned');
+      throw new Error('User creation failed - no user returned from authentication');
     }
 
     console.log('Auth user created successfully:', authData.user.id);
 
-    // Wait a moment for the trigger to process
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait a moment for any triggers to process
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Check if profile was created by trigger, if not create manually
+    // Check if profile was created by trigger
     const { data: existingProfile, error: profileCheckError } = await supabase
       .from('profiles')
       .select('*')
@@ -229,38 +229,65 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
       .maybeSingle();
 
     if (profileCheckError) {
-      console.error('Error checking profile:', profileCheckError);
+      console.error('Error checking for existing profile:', profileCheckError);
+      // Don't throw here, continue to manual creation
     }
 
     if (!existingProfile) {
       console.log('Profile not created by trigger, creating manually...');
       
-      // Create profile manually if trigger didn't work
-      const { data: profileData, error: profileError } = await supabase
+      // Create profile manually
+      const profileData = {
+        id: authData.user.id,
+        email: email,
+        full_name: fullName,
+        role: role,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Inserting profile data:', profileData);
+
+      const { data: newProfile, error: profileError } = await supabase
         .from('profiles')
-        .insert([{
-          id: authData.user.id,
-          email: email,
-          full_name: fullName,
-          role: role,
-        }])
+        .insert([profileData])
         .select()
         .single();
 
       if (profileError) {
         console.error('Error creating profile manually:', profileError);
-        throw new Error(`Failed to create user profile: ${profileError.message}`);
+        
+        // Provide more specific error information
+        if (profileError.code === '23505') {
+          throw new Error('A user with this email already exists');
+        } else if (profileError.code === '42501') {
+          throw new Error('Permission denied. Please check your database policies');
+        } else {
+          throw new Error(`Database error saving new user: ${profileError.message}`);
+        }
       }
 
-      console.log('Profile created manually:', profileData);
-      return { ...authData, profile: profileData };
+      console.log('Profile created manually:', newProfile);
+      return { ...authData, profile: newProfile };
     } else {
-      console.log('Profile created successfully by trigger');
+      console.log('Profile created successfully by trigger:', existingProfile);
       return { ...authData, profile: existingProfile };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('SignUp error:', error);
-    throw error;
+    
+    // Provide user-friendly error messages
+    if (error.message?.includes('User already registered')) {
+      throw new Error('A user with this email address already exists');
+    } else if (error.message?.includes('Password should be at least')) {
+      throw new Error('Password must be at least 6 characters long');
+    } else if (error.message?.includes('Invalid email')) {
+      throw new Error('Please enter a valid email address');
+    } else if (error.message?.includes('Database error saving new user')) {
+      throw error; // Re-throw our custom database error
+    } else {
+      throw new Error(error.message || 'Failed to create user account');
+    }
   }
 };
 
