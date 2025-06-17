@@ -17,7 +17,10 @@ const isSupabaseConfigured = supabaseUrl &&
   supabaseAnonKey && 
   supabaseUrl !== 'your_supabase_project_url' && 
   supabaseAnonKey !== 'your_supabase_anon_key' &&
-  isValidUrl(supabaseUrl);
+  isValidUrl(supabaseUrl) &&
+  !supabaseUrl.includes('localhost') &&
+  !supabaseUrl.includes('127.0.0.1') &&
+  supabaseUrl.includes('supabase.co');
 
 if (!isSupabaseConfigured) {
   console.warn('Supabase is not properly configured. Please set up your Supabase project by clicking "Connect to Supabase" in the top right corner.');
@@ -131,7 +134,7 @@ export interface DailyReport {
 // Auth helper functions
 export const getCurrentUser = async () => {
   if (!isSupabaseConfigured) {
-    console.warn('Supabase not configured');
+    console.warn('getCurrentUser: Supabase not configured');
     return null;
   }
 
@@ -141,6 +144,13 @@ export const getCurrentUser = async () => {
     
     if (userError) {
       console.error('getCurrentUser: Error getting auth user:', userError);
+      
+      // Handle specific network errors
+      if (userError.message?.includes('Failed to fetch') || userError.message?.includes('fetch')) {
+        console.error('getCurrentUser: Network error - Supabase may not be properly configured or accessible');
+        throw new Error('Unable to connect to authentication service. Please check your Supabase configuration.');
+      }
+      
       return null;
     }
     
@@ -160,6 +170,12 @@ export const getCurrentUser = async () => {
 
     if (profileError) {
       console.error('getCurrentUser: Error getting user profile:', profileError);
+      
+      // Handle network errors for profile fetch
+      if (profileError.message?.includes('Failed to fetch') || profileError.message?.includes('fetch')) {
+        console.error('getCurrentUser: Network error fetching profile - Supabase may not be properly configured');
+        throw new Error('Unable to connect to database service. Please check your Supabase configuration.');
+      }
       
       // Provide more specific error information
       if (profileError.code === 'PGRST116') {
@@ -181,8 +197,14 @@ export const getCurrentUser = async () => {
 
     console.log('getCurrentUser: Profile loaded successfully:', profile.email);
     return profile;
-  } catch (error) {
+  } catch (error: any) {
     console.error('getCurrentUser: Unexpected error:', error);
+    
+    // Re-throw network configuration errors
+    if (error.message?.includes('Supabase configuration')) {
+      throw error;
+    }
+    
     return null;
   }
 };

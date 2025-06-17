@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, getCurrentUser, signInWithEmail, signUpWithEmail, signOut as supabaseSignOut } from '../lib/supabase';
+import { supabase, getCurrentUser, signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, isSupabaseReady } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -36,6 +36,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('AuthProvider: Initializing...');
     
+    // Check if Supabase is configured
+    if (!isSupabaseReady()) {
+      console.warn('AuthProvider: Supabase not configured, skipping authentication');
+      setLoading(false);
+      return;
+    }
+    
     // Get initial session
     const getInitialSession = async () => {
       try {
@@ -45,6 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
+          
+          // Handle network errors gracefully
+          if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
+            console.error('AuthProvider: Network error - Supabase may not be accessible');
+            toast.error('Unable to connect to authentication service. Please check your connection.');
+          }
+          
           setLoading(false);
           return;
         }
@@ -60,8 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               console.log('AuthProvider: No profile found for authenticated user');
             }
-          } catch (profileError) {
+          } catch (profileError: any) {
             console.error('AuthProvider: Error loading user profile:', profileError);
+            
+            // Handle configuration errors
+            if (profileError.message?.includes('Supabase configuration')) {
+              toast.error('Database connection error. Please check your Supabase configuration.');
+            }
           }
         } else {
           console.log('AuthProvider: No existing session found');
@@ -93,9 +112,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.error('AuthProvider: No profile found after sign in');
               toast.error('Profile not found. Please contact administrator.');
             }
-          } catch (profileError) {
+          } catch (profileError: any) {
             console.error('AuthProvider: Error loading profile after sign in:', profileError);
-            toast.error('Error loading user profile. Please try again.');
+            
+            // Handle configuration errors
+            if (profileError.message?.includes('Supabase configuration')) {
+              toast.error('Database connection error. Please check your Supabase configuration.');
+            } else {
+              toast.error('Error loading user profile. Please try again.');
+            }
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -114,6 +139,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseReady()) {
+      toast.error('Authentication service not configured. Please set up Supabase.');
+      throw new Error('Supabase not configured');
+    }
+
     try {
       console.log('AuthProvider: Attempting to sign in with email:', email);
       
@@ -141,6 +171,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'No account found with this email address. Please contact your administrator to create an account.';
       } else if (error.message?.includes('Signup not allowed')) {
         errorMessage = 'Account creation is restricted. Please contact your administrator.';
+      } else if (error.message?.includes('Supabase not configured')) {
+        errorMessage = 'Authentication service not configured. Please set up Supabase.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -151,6 +183,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
+    if (!isSupabaseReady()) {
+      toast.error('Authentication service not configured. Please set up Supabase.');
+      throw new Error('Supabase not configured');
+    }
+
     try {
       console.log('AuthProvider: Attempting to sign up with email:', email, 'role:', role);
       
@@ -181,6 +218,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Please enter a valid email address.';
       } else if (error.message?.includes('Signup not allowed')) {
         errorMessage = 'Account creation is currently restricted. Please contact your administrator.';
+      } else if (error.message?.includes('Supabase not configured')) {
+        errorMessage = 'Authentication service not configured. Please set up Supabase.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -191,6 +230,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (!isSupabaseReady()) {
+      console.warn('Supabase not configured, clearing local state only');
+      setUser(null);
+      toast.success('Signed out successfully!');
+      return;
+    }
+
     try {
       console.log('AuthProvider: Signing out...');
       
@@ -216,7 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
   };
 
-  console.log('AuthProvider: Current state - User:', user?.email || 'None', 'Loading:', loading);
+  console.log('AuthProvider: Current state - User:', user?.email || 'None', 'Loading:', loading, 'Supabase Ready:', isSupabaseReady());
 
   return (
     <AuthContext.Provider value={value}>
