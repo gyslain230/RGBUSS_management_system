@@ -251,69 +251,6 @@ export const signOut = async () => {
   if (error) throw error;
 };
 
-// Check if any users exist in the system
-export const checkUsersExist = async () => {
-  if (!isSupabaseConfigured) {
-    return false;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1);
-
-    if (error) {
-      console.error('Error checking users:', error);
-      return false;
-    }
-
-    return data && data.length > 0;
-  } catch (error) {
-    console.error('Error checking users:', error);
-    return false;
-  }
-};
-
-// Create initial admin user for development
-export const createInitialAdminUser = async () => {
-  if (!isSupabaseConfigured) {
-    throw new Error('Supabase not configured. Please set up your Supabase project.');
-  }
-
-  const adminEmail = 'admin@rgbuss.com';
-  const adminPassword = 'admin123';
-  const adminName = 'System Administrator';
-
-  try {
-    // Check if admin already exists - use maybeSingle() to handle no results gracefully
-    const { data: existingUser, error: checkError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', adminEmail)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Error checking for existing admin:', checkError);
-      throw checkError;
-    }
-
-    if (existingUser) {
-      console.log('Admin user already exists');
-      return { email: adminEmail, password: adminPassword };
-    }
-
-    // Create the admin user using the updated signUpWithEmail function
-    const result = await signUpWithEmail(adminEmail, adminPassword, adminName, 'admin');
-
-    console.log('Initial admin user created successfully');
-    return { email: adminEmail, password: adminPassword };
-  } catch (error) {
-    console.error('Error creating initial admin user:', error);
-    throw error;
-  }
-};
-
 // Utility functions for data operations
 export const createProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
   if (!isSupabaseConfigured) {
