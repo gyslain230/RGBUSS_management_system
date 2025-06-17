@@ -57,7 +57,7 @@ export const supabase = isSupabaseConfigured
 // Database types
 export interface User {
   id: string;
-  phone_number: string;
+  email: string;
   full_name: string;
   role: 'admin' | 'manager' | 'worker';
   created_at: string;
@@ -147,13 +147,13 @@ export const getCurrentUser = async () => {
   return profile;
 };
 
-export const signInWithPhone = async (phone: string, password: string) => {
+export const signInWithEmail = async (email: string, password: string) => {
   if (!isSupabaseConfigured) {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    phone,
+    email,
     password,
   });
 
@@ -161,7 +161,7 @@ export const signInWithPhone = async (phone: string, password: string) => {
   return data;
 };
 
-export const signUpWithPhone = async (phone: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
+export const signUpWithEmail = async (email: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
   if (!isSupabaseConfigured) {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
@@ -169,13 +169,12 @@ export const signUpWithPhone = async (phone: string, password: string, fullName:
   try {
     // Create the auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      phone,
+      email,
       password,
       options: {
         data: {
           full_name: fullName,
-          role: role,
-          phone_number: phone
+          role: role
         }
       }
     });
@@ -211,7 +210,7 @@ export const signUpWithPhone = async (phone: string, password: string, fullName:
         .from('profiles')
         .insert([{
           id: authData.user.id,
-          phone_number: phone,
+          email: email,
           full_name: fullName,
           role: role,
         }])
@@ -282,7 +281,7 @@ export const createInitialAdminUser = async () => {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
-  const adminPhone = '+1234567890';
+  const adminEmail = 'admin@rgbuss.com';
   const adminPassword = 'admin123';
   const adminName = 'System Administrator';
 
@@ -291,7 +290,7 @@ export const createInitialAdminUser = async () => {
     const { data: existingUser, error: checkError } = await supabase
       .from('profiles')
       .select('id')
-      .eq('phone_number', adminPhone)
+      .eq('email', adminEmail)
       .maybeSingle();
 
     if (checkError) {
@@ -301,14 +300,14 @@ export const createInitialAdminUser = async () => {
 
     if (existingUser) {
       console.log('Admin user already exists');
-      return { phone: adminPhone, password: adminPassword };
+      return { email: adminEmail, password: adminPassword };
     }
 
-    // Create the admin user using the updated signUpWithPhone function
-    const result = await signUpWithPhone(adminPhone, adminPassword, adminName, 'admin');
+    // Create the admin user using the updated signUpWithEmail function
+    const result = await signUpWithEmail(adminEmail, adminPassword, adminName, 'admin');
 
     console.log('Initial admin user created successfully');
-    return { phone: adminPhone, password: adminPassword };
+    return { email: adminEmail, password: adminPassword };
   } catch (error) {
     console.error('Error creating initial admin user:', error);
     throw error;

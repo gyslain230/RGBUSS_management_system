@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, getCurrentUser, signInWithPhone, signUpWithPhone, signOut as supabaseSignOut } from '../lib/supabase';
+import { supabase, getCurrentUser, signInWithEmail, signUpWithEmail, signOut as supabaseSignOut } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface User {
   id: string;
-  phone_number: string;
+  email: string;
   full_name: string;
   role: 'admin' | 'manager' | 'worker';
   created_at: string;
@@ -14,8 +14,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (phone: string, password: string) => Promise<void>;
-  signUp: (phone: string, password: string, fullName: string, role: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profile = await getCurrentUser();
           if (profile) {
             setUser(profile);
-            console.log('AuthProvider: User profile loaded:', profile.phone_number, 'Role:', profile.role);
+            console.log('AuthProvider: User profile loaded:', profile.email, 'Role:', profile.role);
           }
         } else {
           console.log('AuthProvider: No existing session');
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profile = await getCurrentUser();
         if (profile) {
           setUser(profile);
-          console.log('AuthProvider: User signed in:', profile.phone_number);
+          console.log('AuthProvider: User signed in:', profile.email);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -81,14 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signIn = async (phone: string, password: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      console.log('AuthProvider: Attempting to sign in with phone:', phone);
+      console.log('AuthProvider: Attempting to sign in with email:', email);
       
-      // Format phone number (ensure it starts with +)
-      const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
-      
-      const { user: authUser } = await signInWithPhone(formattedPhone, password);
+      const { user: authUser } = await signInWithEmail(email, password);
       
       if (!authUser) {
         throw new Error('Authentication failed');
@@ -100,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(profile);
-      console.log('AuthProvider: Successfully signed in:', profile.phone_number, 'Role:', profile.role);
+      console.log('AuthProvider: Successfully signed in:', profile.email, 'Role:', profile.role);
       toast.success(`Signed in successfully as ${profile.role}!`);
     } catch (error: any) {
       console.error('AuthProvider: Sign in failed:', error);
@@ -109,13 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let errorMessage = 'Login failed. Please try again.';
       
       if (error.message?.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid phone number or password. Please check your credentials and try again.';
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
       } else if (error.message?.includes('Email not confirmed')) {
-        errorMessage = 'Please verify your phone number before signing in.';
+        errorMessage = 'Please verify your email address before signing in.';
       } else if (error.message?.includes('Too many requests')) {
         errorMessage = 'Too many login attempts. Please wait a moment and try again.';
       } else if (error.message?.includes('User not found')) {
-        errorMessage = 'No account found with this phone number. Please contact your administrator to create an account.';
+        errorMessage = 'No account found with this email address. Please contact your administrator to create an account.';
       } else if (error.message?.includes('Signup not allowed')) {
         errorMessage = 'Account creation is restricted. Please contact your administrator.';
       } else if (error.message) {
@@ -127,15 +124,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (phone: string, password: string, fullName: string, role: string) => {
+  const signUp = async (email: string, password: string, fullName: string, role: string) => {
     try {
-      console.log('AuthProvider: Attempting to sign up with phone:', phone, 'role:', role);
+      console.log('AuthProvider: Attempting to sign up with email:', email, 'role:', role);
       
-      // Format phone number (ensure it starts with +)
-      const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
-      
-      const { user: authUser } = await signUpWithPhone(
-        formattedPhone, 
+      const { user: authUser } = await signUpWithEmail(
+        email, 
         password, 
         fullName, 
         role as 'admin' | 'manager' | 'worker'
@@ -154,11 +148,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let errorMessage = 'Registration failed. Please try again.';
       
       if (error.message?.includes('User already registered')) {
-        errorMessage = 'A user with this phone number already exists. Please sign in instead.';
+        errorMessage = 'A user with this email address already exists. Please sign in instead.';
       } else if (error.message?.includes('Password should be at least')) {
         errorMessage = 'Password must be at least 6 characters long.';
-      } else if (error.message?.includes('Invalid phone number')) {
-        errorMessage = 'Please enter a valid phone number with country code (e.g., +1234567890).';
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
       } else if (error.message?.includes('Signup not allowed')) {
         errorMessage = 'Account creation is currently restricted. Please contact your administrator.';
       } else if (error.message) {
@@ -192,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
   };
 
-  console.log('AuthProvider: Current state - User:', user?.phone_number, 'Loading:', loading);
+  console.log('AuthProvider: Current state - User:', user?.email, 'Loading:', loading);
 
   return (
     <AuthContext.Provider value={value}>
