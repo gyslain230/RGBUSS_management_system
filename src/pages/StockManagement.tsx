@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Check, X, Package, History } from 'lucide-react';
+import { Plus, Search, Filter, Check, X, Package, History, Settings, AlertTriangle, Eye } from 'lucide-react';
 import { supabase, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddProductModal from '../components/Stock/AddProductModal';
-import ProductCard from '../components/Stock/ProductCard';
+import StockAdjustmentModal from '../components/Stock/StockAdjustmentModal';
 import StockAdjustmentHistory from '../components/Stock/StockAdjustmentHistory';
 
 export default function StockManagement() {
@@ -13,6 +13,9 @@ export default function StockManagement() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGlobalHistory, setShowGlobalHistory] = useState(false);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showProductHistory, setShowProductHistory] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -76,6 +79,15 @@ export default function StockManagement() {
     }
   };
 
+  const handleAdjustStock = (product: Product) => {
+    setSelectedProduct(product);
+    setShowAdjustmentModal(true);
+  };
+
+  const handleShowHistory = (productId: string) => {
+    setShowProductHistory(showProductHistory === productId ? null : productId);
+  };
+
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.category.toLowerCase().includes(searchTerm.toLowerCase());
@@ -86,6 +98,9 @@ export default function StockManagement() {
   });
 
   const categories = Array.from(new Set(products.map(p => p.category)));
+
+  // Check if user can adjust stock (workers, managers, and admins)
+  const canAdjustStock = user?.role === 'worker' || user?.role === 'manager' || user?.role === 'admin';
 
   if (loading) {
     return (
@@ -181,32 +196,165 @@ export default function StockManagement() {
         </div>
       </div>
 
-      {/* Products Grid */}
-      {filteredProducts.length === 0 ? (
-        <div className="text-center py-12">
-          <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-          <p className="text-gray-600 mb-4">
-            {searchTerm || categoryFilter !== 'all' || statusFilter !== 'all'
-              ? 'Try adjusting your filters'
-              : 'Get started by adding your first product'
-            }
-          </p>
+      {/* Products Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Products ({filteredProducts.length})</h2>
+              <p className="text-sm text-gray-600">Manage your product inventory</p>
+            </div>
+            <Package className="h-6 w-6 text-blue-600" />
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onApprove={handleApproveProduct}
-              onReject={handleRejectProduct}
-              onStockUpdated={fetchProducts}
-              canManage={user?.role === 'admin'}
-            />
-          ))}
-        </div>
-      )}
+
+        {filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm || categoryFilter !== 'all' || statusFilter !== 'all'
+                ? 'Try adjusting your filters'
+                : 'Get started by adding your first product'
+              }
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Product
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Category
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Quantity
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredProducts.map((product) => {
+                  const isLowStock = product.quantity < 5;
+                  return (
+                    <React.Fragment key={product.id}>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                            {product.description && (
+                              <div className="text-sm text-gray-500 truncate max-w-xs">
+                                {product.description}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {product.category}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          ${product.price}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-sm font-medium ${
+                              isLowStock && product.status === 'approved' ? 'text-red-600' : 'text-gray-900'
+                            }`}>
+                              {product.quantity}
+                            </span>
+                            {isLowStock && product.status === 'approved' && (
+                              <div className="flex items-center">
+                                <AlertTriangle className="h-4 w-4 text-red-500" />
+                                <span className="text-xs text-red-500 ml-1">Low</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            product.status === 'approved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {product.status === 'approved' ? 'Approved' : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2">
+                            {/* Admin Actions for Pending Products */}
+                            {user?.role === 'admin' && product.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleApproveProduct(product.id)}
+                                  className="text-green-600 hover:text-green-900 transition-colors"
+                                  title="Approve product"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleRejectProduct(product.id)}
+                                  className="text-red-600 hover:text-red-900 transition-colors"
+                                  title="Reject product"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+
+                            {/* Stock Adjustment for Approved Products */}
+                            {canAdjustStock && product.status === 'approved' && (
+                              <button
+                                onClick={() => handleAdjustStock(product)}
+                                className="text-blue-600 hover:text-blue-900 transition-colors"
+                                title="Adjust stock"
+                              >
+                                <Settings className="h-4 w-4" />
+                              </button>
+                            )}
+
+                            {/* History Button */}
+                            {product.status === 'approved' && (
+                              <button
+                                onClick={() => handleShowHistory(product.id)}
+                                className="text-gray-600 hover:text-gray-900 transition-colors"
+                                title="View adjustment history"
+                              >
+                                <History className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Product History Row */}
+                      {showProductHistory === product.id && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                            <div className="max-w-full">
+                              <StockAdjustmentHistory productId={product.id} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Add Product Modal */}
       {showAddModal && (
@@ -215,6 +363,23 @@ export default function StockManagement() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
+            fetchProducts();
+          }}
+        />
+      )}
+
+      {/* Stock Adjustment Modal */}
+      {showAdjustmentModal && selectedProduct && (
+        <StockAdjustmentModal
+          isOpen={showAdjustmentModal}
+          onClose={() => {
+            setShowAdjustmentModal(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+          onSuccess={() => {
+            setShowAdjustmentModal(false);
+            setSelectedProduct(null);
             fetchProducts();
           }}
         />
