@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import LoginForm from './components/Auth/LoginForm';
+import RegisterForm from './components/Auth/RegisterForm';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import StockManagement from './pages/StockManagement';
@@ -44,6 +45,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginForm />} />
+            <Route path="/register" element={<RegisterForm />} />
             
             {/* Protected Routes */}
             <Route path="/dashboard" element={

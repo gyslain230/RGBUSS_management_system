@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell, LogOut, Phone } from 'lucide-react';
+import { Menu, Bell, LogOut, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Header() {
@@ -38,8 +38,8 @@ export default function Header() {
               <div className="hidden md:block">
                 <div className="text-sm font-medium text-gray-900">{user?.full_name}</div>
                 <div className="text-xs text-gray-500 flex items-center">
-                  <Phone className="h-3 w-3 mr-1" />
-                  {user?.phone_number} • {user?.role}
+                  <Mail className="h-3 w-3 mr-1" />
+                  {user?.email} • {user?.role}
                 </div>
               </div>
               <button

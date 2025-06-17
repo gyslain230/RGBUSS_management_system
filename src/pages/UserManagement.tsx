@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Trash2, Shield, Phone } from 'lucide-react';
+import { Users, Plus, Trash2, Shield, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -7,7 +7,7 @@ import AddUserModal from '../components/Users/AddUserModal';
 
 interface UserProfile {
   id: string;
-  phone_number: string;
+  email: string;
   full_name: string;
   role: 'admin' | 'manager' | 'worker';
   created_at: string;
@@ -116,7 +116,7 @@ export default function UserManagement() {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">Manage user accounts and permissions</p>
           <p className="text-sm text-blue-600 mt-1">
-            📱 Users authenticate with phone numbers and passwords
+            📧 Users authenticate with email addresses and passwords
           </p>
         </div>
         <button
@@ -150,7 +150,7 @@ export default function UserManagement() {
                     User
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Phone Number
+                    Email Address
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
@@ -183,8 +183,8 @@ export default function UserManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center text-sm text-gray-600">
-                        <Phone className="h-4 w-4 mr-2 text-gray-400" />
-                        {user.phone_number}
+                        <Mail className="h-4 w-4 mr-2 text-gray-400" />
+                        {user.email}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -235,15 +235,15 @@ export default function UserManagement() {
       {/* Information Panel */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex">
-          <Phone className="h-5 w-5 text-blue-400 mt-0.5" />
+          <Mail className="h-5 w-5 text-blue-400 mt-0.5" />
           <div className="ml-3">
             <h3 className="text-sm font-medium text-blue-800">
-              Phone Authentication System
+              Email Authentication System
             </h3>
             <div className="mt-2 text-sm text-blue-700">
               <ul className="list-disc list-inside space-y-1">
-                <li>Users authenticate using phone numbers instead of email addresses</li>
-                <li>Phone numbers must include country codes (e.g., +1234567890)</li>
+                <li>Users authenticate using email addresses instead of phone numbers</li>
+                <li>Email addresses must be valid and unique across the system</li>
                 <li>Only administrators can create new user accounts</li>
                 <li>All user data is stored securely in Supabase database</li>
                 <li>Role-based access control is enforced at the database level</li>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Phone } from 'lucide-react';
+import { X, Mail } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -11,7 +11,7 @@ interface AddUserModalProps {
 }
 
 interface UserFormData {
-  phone_number: string;
+  email: string;
   password: string;
   fullName: string;
   role: 'admin' | 'manager' | 'worker';
@@ -26,10 +26,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
   const onSubmit = async (data: UserFormData) => {
     setLoading(true);
     try {
-      // Format phone number
-      const formattedPhone = data.phone_number.startsWith('+') ? data.phone_number : `+${data.phone_number}`;
-      
-      await signUp(formattedPhone, data.password, data.fullName, data.role);
+      await signUp(data.email, data.password, data.fullName, data.role);
       reset();
       onSuccess();
     } catch (error) {
@@ -71,31 +68,46 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number
+              Email Address
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Phone className="h-4 w-4 text-gray-400" />
+                <Mail className="h-4 w-4 text-gray-400" />
               </div>
               <input
-                type="tel"
-                {...register('phone_number', { 
-                  required: 'Phone number is required',
+                type="email"
+                {...register('email', { 
+                  required: 'Email is required',
                   pattern: {
-                    value: /^\+?[1-9]\d{1,14}$/,
-                    message: 'Please enter a valid phone number with country code'
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Invalid email address'
                   }
                 })}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter phone number (e.g., +1234567890)"
+                placeholder="Enter email address"
               />
             </div>
-            {errors.phone_number && (
-              <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>
+            {errors.email && (
+              <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              Include country code (e.g., +1 for US, +33 for France)
-            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Role
+            </label>
+            <select
+              {...register('role', { required: 'Role is required' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select role</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="worker">Worker</option>
+            </select>
+            {errors.role && (
+              <p className="text-red-500 text-sm mt-1">{errors.role.message}</p>
+            )}
           </div>
 
           <div>
@@ -119,24 +131,6 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role
-            </label>
-            <select
-              {...register('role', { required: 'Role is required' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select role</option>
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="worker">Worker</option>
-            </select>
-            {errors.role && (
-              <p className="text-red-500 text-sm mt-1">{errors.role.message}</p>
-            )}
-          </div>
-
           <div className="flex space-x-3 pt-4">
             <button
               type="button"
@@ -155,13 +149,13 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
           </div>
         </form>
 
-        {/* Information about phone authentication */}
+        {/* Information about email authentication */}
         <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
           <div className="text-sm text-blue-700">
-            <p className="font-medium mb-1">📱 Phone Authentication</p>
+            <p className="font-medium mb-1">📧 Email Authentication</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
-              <li>Users will sign in using their phone number and password</li>
-              <li>Phone number must include country code</li>
+              <li>Users will sign in using their email address and password</li>
+              <li>Email address must be valid and unique</li>
               <li>Password must be at least 6 characters long</li>
             </ul>
           </div>
