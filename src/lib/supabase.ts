@@ -3,11 +3,45 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+// Check if environment variables are properly configured
+const isValidUrl = (url: string) => {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const isSupabaseConfigured = supabaseUrl && 
+  supabaseAnonKey && 
+  supabaseUrl !== 'your_supabase_project_url' && 
+  supabaseAnonKey !== 'your_supabase_anon_key' &&
+  isValidUrl(supabaseUrl);
+
+if (!isSupabaseConfigured) {
+  console.warn('Supabase is not properly configured. Please set up your Supabase project by clicking "Connect to Supabase" in the top right corner.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create a mock client for development when Supabase is not configured
+const createMockClient = () => ({
+  auth: {
+    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+    signInWithPassword: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+    signUp: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+    signOut: () => Promise.resolve({ error: null }),
+  },
+  from: () => ({
+    select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }) }) }),
+    insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }) }) }),
+    update: () => ({ eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }) }) }) }),
+    delete: () => ({ neq: () => Promise.resolve({ error: new Error('Supabase not configured') }) }),
+  }),
+});
+
+export const supabase = isSupabaseConfigured 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : createMockClient() as any;
 
 // Database types
 export interface User {
@@ -85,6 +119,11 @@ export interface DailyReport {
 
 // Auth helper functions
 export const getCurrentUser = async () => {
+  if (!isSupabaseConfigured) {
+    console.warn('Supabase not configured');
+    return null;
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
@@ -98,6 +137,10 @@ export const getCurrentUser = async () => {
 };
 
 export const signInWithPhone = async (phone: string, password: string) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({
     phone,
     password,
@@ -108,6 +151,10 @@ export const signInWithPhone = async (phone: string, password: string) => {
 };
 
 export const signUpWithPhone = async (phone: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase.auth.signUp({
     phone,
     password,
@@ -124,12 +171,21 @@ export const signUpWithPhone = async (phone: string, password: string, fullName:
 };
 
 export const signOut = async () => {
+  if (!isSupabaseConfigured) {
+    console.warn('Supabase not configured');
+    return;
+  }
+
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 };
 
 // Utility functions for data operations
 export const createProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase
     .from('products')
     .insert([productData])
@@ -141,6 +197,10 @@ export const createProduct = async (productData: Omit<Product, 'id' | 'created_a
 };
 
 export const updateProduct = async (id: string, updates: Partial<Product>) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase
     .from('products')
     .update(updates)
@@ -153,6 +213,10 @@ export const updateProduct = async (id: string, updates: Partial<Product>) => {
 };
 
 export const createSale = async (saleData: Omit<Sale, 'id' | 'created_at'>) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase
     .from('sales')
     .insert([saleData])
@@ -164,6 +228,10 @@ export const createSale = async (saleData: Omit<Sale, 'id' | 'created_at'>) => {
 };
 
 export const createCredit = async (creditData: Omit<Credit, 'id' | 'created_at' | 'updated_at'>) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase
     .from('credits')
     .insert([creditData])
@@ -175,6 +243,10 @@ export const createCredit = async (creditData: Omit<Credit, 'id' | 'created_at' 
 };
 
 export const updateCredit = async (id: string, updates: Partial<Credit>) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase
     .from('credits')
     .update(updates)
@@ -187,6 +259,10 @@ export const updateCredit = async (id: string, updates: Partial<Credit>) => {
 };
 
 export const createStockAdjustment = async (adjustmentData: Omit<StockAdjustment, 'id' | 'created_at'>) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
   const { data, error } = await supabase
     .from('stock_adjustments')
     .insert([adjustmentData])
@@ -199,6 +275,11 @@ export const createStockAdjustment = async (adjustmentData: Omit<StockAdjustment
 
 // Debug functions
 export const debugDatabase = async () => {
+  if (!isSupabaseConfigured) {
+    console.warn('Supabase not configured. Cannot debug database.');
+    return;
+  }
+
   console.log('Database Debug Information:');
   
   const tables = ['profiles', 'products', 'sales', 'credits', 'stock_adjustments', 'daily_reports'];
@@ -221,6 +302,11 @@ export const debugDatabase = async () => {
 };
 
 export const clearAllData = async () => {
+  if (!isSupabaseConfigured) {
+    console.warn('Supabase not configured. Cannot clear data.');
+    return;
+  }
+
   console.log('Clearing all database data...');
   
   const tables = ['daily_reports', 'stock_adjustments', 'credits', 'sales', 'products'];
@@ -240,3 +326,6 @@ export const clearAllData = async () => {
   
   console.log('All data cleared');
 };
+
+// Export configuration status for components to check
+export const isSupabaseReady = () => isSupabaseConfigured;
