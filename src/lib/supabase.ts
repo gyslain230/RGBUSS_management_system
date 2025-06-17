@@ -51,6 +51,7 @@ const createMockClient = () => ({
     update: () => ({ eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }) }) }) }),
     delete: () => ({ neq: () => Promise.resolve({ error: new Error('Supabase not configured') }) }),
   }),
+  rpc: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
 });
 
 export const supabase = isSupabaseConfigured 
@@ -129,6 +130,25 @@ export interface DailyReport {
   created_at: string;
   report_data: any;
   created_by: string;
+}
+
+// New interface for daily reports storage
+export interface DailyReportStorage {
+  id: string;
+  report_date: string;
+  no: number;
+  libelle: string;
+  stock: number;
+  entres: number;
+  total_jour: number;
+  solde: number;
+  sortie: number;
+  p_unit1: number;
+  p_total: number;
+  amavide: number;
+  product_id: string;
+  created_at: string;
+  created_by?: string;
 }
 
 // Auth helper functions with comprehensive error handling
@@ -525,6 +545,75 @@ export const createInitialAdminUser = async () => {
   }
 };
 
+// Daily Reports Storage Functions
+export const getDailyReportsStorage = async (startDate?: string, endDate?: string) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
+  try {
+    let query = supabase
+      .from('daily_reports_storage')
+      .select('*')
+      .order('report_date', { ascending: false })
+      .order('no', { ascending: true });
+
+    if (startDate) {
+      query = query.gte('report_date', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('report_date', endDate);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching daily reports storage:', error);
+    throw error;
+  }
+};
+
+export const generateDailyReport = async (targetDate: string = new Date().toISOString().split('T')[0]) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('manual_generate_daily_report', {
+      target_date: targetDate
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error generating daily report:', error);
+    throw error;
+  }
+};
+
+export const getDailyReportForDate = async (date: string) => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured. Please set up your Supabase project.');
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('daily_reports_storage')
+      .select('*')
+      .eq('report_date', date)
+      .order('no', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching daily report for date:', error);
+    throw error;
+  }
+};
+
 // Utility functions for data operations
 export const createProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
   if (!isSupabaseConfigured) {
@@ -627,7 +716,7 @@ export const debugDatabase = async () => {
 
   console.log('Database Debug Information:');
   
-  const tables = ['profiles', 'products', 'sales', 'credits', 'stock_adjustments', 'daily_reports'];
+  const tables = ['profiles', 'products', 'sales', 'credits', 'stock_adjustments', 'daily_reports', 'daily_reports_storage'];
   
   for (const table of tables) {
     try {
@@ -654,7 +743,7 @@ export const clearAllData = async () => {
 
   console.log('Clearing all database data...');
   
-  const tables = ['daily_reports', 'stock_adjustments', 'credits', 'sales', 'products'];
+  const tables = ['daily_reports', 'daily_reports_storage', 'stock_adjustments', 'credits', 'sales', 'products'];
   
   for (const table of tables) {
     try {

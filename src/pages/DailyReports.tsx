@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, RefreshCw, Info, Package, AlertCircle, CreditCard } from 'lucide-react';
+import { FileText, Download, Calendar, RefreshCw, Info, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Product, Sale, StockAdjustment, Credit } from '../lib/supabase';
+import { supabase, Product, Sale, StockAdjustment, Credit, DailyReportStorage, getDailyReportsStorage, generateDailyReport, getDailyReportForDate } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -32,12 +32,15 @@ export default function DailyReports() {
   const { user } = useAuth();
   const [reportData, setReportData] = useState<DailyReportData[]>([]);
   const [creditsData, setCreditsData] = useState<Credit[]>([]);
+  const [storedReports, setStoredReports] = useState<DailyReportStorage[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [refreshing, setRefreshing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [isFirstDay, setIsFirstDay] = useState(false);
   const [adjustmentsFound, setAdjustmentsFound] = useState(0);
   const [hasReportData, setHasReportData] = useState(false);
+  const [useStoredData, setUseStoredData] = useState(false);
 
   useEffect(() => {
     fetchReportData();
@@ -47,7 +50,19 @@ export default function DailyReports() {
     try {
       const previousDate = format(subDays(new Date(currentDate), 1), 'yyyy-MM-dd');
       
-      // Check if there are any stock adjustments before the current date
+      // First check stored reports for previous day
+      const { data: storedReport } = await supabase
+        .from('daily_reports_storage')
+        .select('solde')
+        .eq('product_id', productId)
+        .eq('report_date', previousDate)
+        .single();
+
+      if (storedReport) {
+        return storedReport.solde;
+      }
+
+      // Fallback to stock adjustments
       const { data: historicalAdjustments, error } = await supabase
         .from('stock_adjustments')
         .select('*')
@@ -58,12 +73,10 @@ export default function DailyReports() {
 
       if (error) throw error;
 
-      // If no historical adjustments exist, this is the first day - stock should be 0
       if (!historicalAdjustments || historicalAdjustments.length === 0) {
         return 0;
       }
 
-      // Get the last known stock level from the most recent adjustment before current date
       const lastAdjustment = historicalAdjustments[0];
       return lastAdjustment.new_quantity;
     } catch (error) {
@@ -77,6 +90,52 @@ export default function DailyReports() {
     try {
       console.log('🔍 Fetching report data for date:', selectedDate);
       
+      // First check if we have stored data for this date
+      const storedData = await getDailyReportForDate(selectedDate);
+      
+      if (storedData && storedData.length > 0) {
+        console.log('📊 Found stored report data:', storedData.length, 'items');
+        setStoredReports(storedData);
+        setUseStoredData(true);
+        setHasReportData(true);
+        
+        // Convert stored data to display format
+        const convertedData: DailyReportData[] = storedData.map(item => ({
+          no: item.no,
+          libelle: item.libelle,
+          stock: item.stock,
+          entres: item.entres,
+          totalJour: item.total_jour,
+          solde: item.solde,
+          sortie: item.sortie,
+          pUnit1: item.p_unit1,
+          pTotal: item.p_total,
+          amavide: item.amavide,
+          productId: item.product_id
+        }));
+        
+        setReportData(convertedData);
+        setAdjustmentsFound(storedData.reduce((sum, item) => sum + item.entres, 0));
+      } else {
+        console.log('📊 No stored data found, generating live report');
+        setUseStoredData(false);
+        await generateLiveReport();
+      }
+
+      // Always fetch credits for the selected date
+      await fetchCreditsForDate();
+      
+    } catch (error) {
+      console.error('❌ Error fetching report data:', error);
+      toast.error('Error loading report data');
+      setHasReportData(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateLiveReport = async () => {
+    try {
       // Fetch all approved products
       const { data: products, error: productsError } = await supabase
         .from('products')
@@ -87,11 +146,9 @@ export default function DailyReports() {
       if (productsError) throw productsError;
       console.log('📦 Found products:', products?.length || 0);
 
-      // Fetch stock adjustments for the selected date with broader time range
+      // Fetch stock adjustments for the selected date
       const startOfDay = `${selectedDate}T00:00:00.000Z`;
       const endOfDay = `${selectedDate}T23:59:59.999Z`;
-
-      console.log('📅 Searching for adjustments between:', startOfDay, 'and', endOfDay);
 
       const { data: adjustments, error: adjustmentsError } = await supabase
         .from('stock_adjustments')
@@ -103,22 +160,9 @@ export default function DailyReports() {
       if (adjustmentsError) throw adjustmentsError;
       
       console.log('📊 Found adjustments for selected date:', adjustments?.length || 0);
-      console.log('📊 Adjustments details:', adjustments);
       setAdjustmentsFound(adjustments?.length || 0);
 
-      // Fetch credits for the selected date
-      const { data: credits, error: creditsError } = await supabase
-        .from('credits')
-        .select('*')
-        .gte('created_at', startOfDay)
-        .lte('created_at', endOfDay)
-        .order('created_at', { ascending: false });
-
-      if (creditsError) throw creditsError;
-      console.log('💳 Found credits for selected date:', credits?.length || 0);
-      setCreditsData(credits || []);
-
-      // Also fetch all adjustments to check if this is the first day
+      // Check if this is the first day
       const { data: allAdjustments, error: allAdjustmentsError } = await supabase
         .from('stock_adjustments')
         .select('created_at')
@@ -133,52 +177,30 @@ export default function DailyReports() {
       
       const isFirstDayEver = !firstAdjustmentDate || selectedDate <= firstAdjustmentDate;
       setIsFirstDay(isFirstDayEver);
-      console.log('🏁 Is first day:', isFirstDayEver);
 
-      // Check if we have meaningful report data
       const hasData = (products && products.length > 0) && 
-                     ((adjustments && adjustments.length > 0) || 
-                      (credits && credits.length > 0) || 
-                      isFirstDayEver);
+                     ((adjustments && adjustments.length > 0) || isFirstDayEver);
       
       setHasReportData(hasData);
-      console.log('📊 Has report data:', hasData);
 
       // Process data for each product
       const processedData: DailyReportData[] = await Promise.all(
         (products || []).map(async (product, index) => {
-          console.log(`🔄 Processing product: ${product.name} (ID: ${product.id})`);
-          
-          // Get stock from previous day (0 if first day)
           const previousDayStock = isFirstDayEver ? 0 : await getPreviousDayStock(product.id, selectedDate);
-          console.log(`📈 Previous day stock for ${product.name}:`, previousDayStock);
           
-          // Calculate stock adjustments (entres) for this product on the selected date
           const productAdjustments = (adjustments || []).filter(adj => adj.product_id === product.id);
-          console.log(`📊 Product adjustments for ${product.name}:`, productAdjustments);
           
-          // Calculate entres (increases only)
           const entres = productAdjustments
             .filter(adj => adj.adjustment_type === 'increase')
             .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
-          
-          console.log(`📈 Entres for ${product.name}:`, entres);
 
-          // Calculate values based on business logic
-          const stock = previousDayStock; // Stock = previous day's solde
-          const totalJour = stock + entres; // Total available for the day
-          const solde = Number(product.quantity) || 0; // Current balance (end of day)
-          
-          // Sortie = Total/Jour - Solde
+          const stock = previousDayStock;
+          const totalJour = stock + entres;
+          const solde = Number(product.quantity) || 0;
           const sortie = totalJour - solde;
-          
-          const pUnit1 = Number(product.price) || 0; // Unit price
-          const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
-          const amavide = Math.max(0, solde - 5); // Available minus minimum stock (5)
-
-          console.log(`📊 Calculated values for ${product.name}:`, {
-            stock, entres, totalJour, solde, sortie, pUnit1, pTotal, amavide
-          });
+          const pUnit1 = Number(product.price) || 0;
+          const pTotal = sortie * pUnit1;
+          const amavide = Math.max(0, solde - 5);
 
           return {
             no: index + 1,
@@ -196,14 +218,30 @@ export default function DailyReports() {
         })
       );
 
-      console.log('✅ Final processed data:', processedData);
       setReportData(processedData);
     } catch (error) {
-      console.error('❌ Error fetching report data:', error);
-      toast.error('Error loading report data');
-      setHasReportData(false);
-    } finally {
-      setLoading(false);
+      console.error('Error generating live report:', error);
+      throw error;
+    }
+  };
+
+  const fetchCreditsForDate = async () => {
+    try {
+      const startOfDay = `${selectedDate}T00:00:00.000Z`;
+      const endOfDay = `${selectedDate}T23:59:59.999Z`;
+
+      const { data: credits, error: creditsError } = await supabase
+        .from('credits')
+        .select('*')
+        .gte('created_at', startOfDay)
+        .lte('created_at', endOfDay)
+        .order('created_at', { ascending: false });
+
+      if (creditsError) throw creditsError;
+      setCreditsData(credits || []);
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+      setCreditsData([]);
     }
   };
 
@@ -214,20 +252,36 @@ export default function DailyReports() {
     toast.success('Report data refreshed');
   };
 
+  const handleGenerateAndStore = async () => {
+    setGenerating(true);
+    try {
+      const result = await generateDailyReport(selectedDate);
+      console.log('Generated daily report:', result);
+      
+      toast.success(`Daily report generated and stored! ${result.products_processed} products processed.`);
+      
+      // Refresh the data to show the newly stored report
+      await fetchReportData();
+    } catch (error) {
+      console.error('Error generating daily report:', error);
+      toast.error('Error generating daily report');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleExportReport = () => {
-    // Check if we have meaningful report data
     if (!hasReportData || (reportData.length === 0 && creditsData.length === 0 && adjustmentsFound === 0)) {
       toast.error(`No daily report data found for ${format(new Date(selectedDate), 'MMMM dd, yyyy')}. Please select a date with stock adjustments or credits.`);
       return;
     }
 
     try {
-      // Create PDF in A4 format
       const doc = new jsPDF('portrait', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       
-      // Header - Company Name and Title
+      // Header
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('BAR LE BON SAMARITAIN', 20, 20);
@@ -236,52 +290,45 @@ export default function DailyReports() {
       doc.setFont('helvetica', 'normal');
       doc.text('FICHE D\'EXPLOITATION/CAISSE', 20, 28);
       
-      // Date
+      // Date and source
       doc.setFontSize(10);
       doc.text(`DATE: ${format(new Date(selectedDate), 'dd/MM/yyyy')}`, 20, 36);
+      doc.text(`Source: ${useStoredData ? 'Stored Database Report' : 'Live Generated Report'}`, 20, 42);
 
-      // Column headers for the main table (matching the image exactly)
-      const startY = 45;
+      // Main table
+      const startY = 50;
       const rowHeight = 6;
-      const colWidths = [12, 45, 15, 15, 20, 15, 15, 18, 18, 15]; // Adjusted column widths
+      const colWidths = [12, 45, 15, 15, 20, 15, 15, 18, 18, 15];
       let currentX = 20;
 
-      // Draw table headers
+      // Table headers
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      
-      // Header row
       doc.rect(20, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
       
       const headers = ['No', 'LIBELLE', 'Stock', 'Entres', 'Total/Jour', 'Solde', 'Sortie', 'P.Unit 1', 'P.Total', 'Amavide'];
       
       currentX = 20;
       headers.forEach((header, index) => {
-        // Draw vertical lines
         if (index > 0) {
           doc.line(currentX, startY, currentX, startY + rowHeight);
         }
-        
-        // Add text
         doc.text(header, currentX + 2, startY + 4);
         currentX += colWidths[index];
       });
-      
-      // Draw right border
       doc.line(currentX, startY, currentX, startY + rowHeight);
 
       // Data rows
       doc.setFont('helvetica', 'normal');
       let currentY = startY + rowHeight;
       
-      reportData.forEach((item, index) => {
-        // Draw row border
+      reportData.forEach((item) => {
         doc.rect(20, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
         
         currentX = 20;
         const rowData = [
           item.no.toString(),
-          item.libelle.substring(0, 20), // Truncate long names
+          item.libelle.substring(0, 20),
           item.stock.toString(),
           item.entres.toString(),
           item.totalJour.toString(),
@@ -293,13 +340,11 @@ export default function DailyReports() {
         ];
         
         rowData.forEach((data, colIndex) => {
-          // Draw vertical lines
           if (colIndex > 0) {
             doc.line(currentX, currentY, currentX, currentY + rowHeight);
           }
           
-          // Add text (right align for numbers, left align for text)
-          const isNumber = colIndex > 1; // All columns except No and LIBELLE are numbers
+          const isNumber = colIndex > 1;
           if (isNumber) {
             doc.text(data, currentX + colWidths[colIndex] - 2, currentY + 4, { align: 'right' });
           } else {
@@ -308,7 +353,6 @@ export default function DailyReports() {
           currentX += colWidths[colIndex];
         });
         
-        // Draw right border
         doc.line(currentX, currentY, currentX, currentY + rowHeight);
         currentY += rowHeight;
       });
@@ -333,14 +377,12 @@ export default function DailyReports() {
       ];
       
       totalRowData.forEach((data, colIndex) => {
-        // Draw vertical lines
         if (colIndex > 0) {
           doc.line(currentX, currentY, currentX, currentY + rowHeight);
         }
         
-        // Add text
         if (data) {
-          const isNumber = colIndex > 1 && colIndex !== 7; // Skip P.Unit 1 column
+          const isNumber = colIndex > 1 && colIndex !== 7;
           if (isNumber) {
             doc.text(data, currentX + colWidths[colIndex] - 2, currentY + 4, { align: 'right' });
           } else {
@@ -350,23 +392,20 @@ export default function DailyReports() {
         currentX += colWidths[colIndex];
       });
       
-      // Draw right border
       doc.line(currentX, currentY, currentX, currentY + rowHeight);
       currentY += rowHeight + 10;
 
-      // Section 2: DETTE (Credits) - Bottom left
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('2.(DETTE NOM ET PRENOM + MONTANT)', 20, currentY);
-      currentY += 8;
-
+      // Credits section
       if (creditsData.length > 0) {
-        // Credit table headers
-        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('2.(DETTE NOM ET PRENOM + MONTANT)', 20, currentY);
+        currentY += 8;
+
         const creditColWidths = [15, 60, 25];
         const creditHeaders = ['No', 'NOM ET PRENOM', 'MONTANT'];
         
-        // Header row
+        doc.setFontSize(8);
         doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
         currentX = 20;
         
@@ -380,7 +419,6 @@ export default function DailyReports() {
         doc.line(currentX, currentY, currentX, currentY + rowHeight);
         currentY += rowHeight;
 
-        // Credit data rows
         doc.setFont('helvetica', 'normal');
         creditsData.forEach((credit, index) => {
           doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
@@ -397,7 +435,7 @@ export default function DailyReports() {
               doc.line(currentX, currentY, currentX, currentY + rowHeight);
             }
             
-            if (colIndex === 2) { // Amount column - right align
+            if (colIndex === 2) {
               doc.text(data, currentX + creditColWidths[colIndex] - 2, currentY + 4, { align: 'right' });
             } else {
               doc.text(data, currentX + 2, currentY + 4);
@@ -408,7 +446,7 @@ export default function DailyReports() {
           currentY += rowHeight;
         });
 
-        // Credit total row
+        // Credit total
         doc.setFont('helvetica', 'bold');
         const totalCreditAmount = creditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
         doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
@@ -431,21 +469,17 @@ export default function DailyReports() {
           currentX += creditColWidths[colIndex];
         });
         doc.line(currentX, currentY, currentX, currentY + rowHeight);
-      } else {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.text('No credits found for this date', 20, currentY);
       }
 
-      // Footer information
+      // Footer
       const footerY = pageHeight - 30;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
       doc.text(`Generated by: ${user?.full_name}`, 20, footerY);
       doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 20, footerY + 5);
+      doc.text(`Data source: ${useStoredData ? 'Database Storage' : 'Live Generation'}`, 20, footerY + 10);
       doc.text('RGBUSS Business Management System', pageWidth - 20, footerY, { align: 'right' });
 
-      // Save the PDF
       const fileName = `daily-report-${selectedDate}.pdf`;
       doc.save(fileName);
 
@@ -456,7 +490,6 @@ export default function DailyReports() {
     }
   };
 
-  // Calculate totals with proper number conversion
   const calculateTotals = () => {
     return {
       totalStock: reportData.reduce((sum, item) => sum + Number(item.stock || 0), 0),
@@ -488,7 +521,7 @@ export default function DailyReports() {
           <p className="text-gray-600">Comprehensive daily inventory and sales report</p>
           <div className="flex items-center space-x-4 mt-2">
             <p className="text-sm text-green-600">
-              📊 Stock = Previous day's solde • Entres = New products + Stock adjustments
+              📊 {useStoredData ? 'Showing stored database report' : 'Showing live generated report'}
             </p>
             <span className="text-gray-300">•</span>
             <p className="text-sm text-blue-600">
@@ -509,6 +542,18 @@ export default function DailyReports() {
             />
           </div>
 
+          {/* Generate & Store Button */}
+          {!useStoredData && (
+            <button
+              onClick={handleGenerateAndStore}
+              disabled={generating}
+              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              <Database className={`h-4 w-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
+              {generating ? 'Storing...' : 'Generate & Store'}
+            </button>
+          )}
+
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
@@ -527,6 +572,48 @@ export default function DailyReports() {
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </button>
+        </div>
+      </div>
+
+      {/* Data Source Information */}
+      <div className={`p-4 rounded-lg border ${
+        useStoredData 
+          ? 'bg-green-50 border-green-200' 
+          : 'bg-blue-50 border-blue-200'
+      }`}>
+        <div className="flex">
+          {useStoredData ? (
+            <Database className="h-5 w-5 text-green-400 mt-0.5" />
+          ) : (
+            <Clock className="h-5 w-5 text-blue-400 mt-0.5" />
+          )}
+          <div className="ml-3">
+            <h3 className={`text-sm font-medium ${
+              useStoredData ? 'text-green-800' : 'text-blue-800'
+            }`}>
+              {useStoredData ? 'Stored Database Report' : 'Live Generated Report'}
+            </h3>
+            <div className={`mt-2 text-sm ${
+              useStoredData ? 'text-green-700' : 'text-blue-700'
+            }`}>
+              {useStoredData ? (
+                <p>
+                  This report was previously generated and stored in the database. 
+                  Data is final and represents the state at the time of generation.
+                </p>
+              ) : (
+                <div>
+                  <p>
+                    This report is generated live from current data. 
+                    Click "Generate & Store" to save this report to the database for permanent storage.
+                  </p>
+                  <p className="mt-1 font-medium">
+                    💡 Stored reports are automatically generated at midnight each day.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -558,76 +645,6 @@ export default function DailyReports() {
         </div>
       )}
 
-      {/* Debug Information */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex">
-          <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800">
-              Debug Information
-            </h3>
-            <div className="mt-2 text-sm text-yellow-700">
-              <p>
-                <strong>Selected Date:</strong> {selectedDate} | 
-                <strong> Adjustments Found:</strong> {adjustmentsFound} | 
-                <strong> Products:</strong> {reportData.length} | 
-                <strong> Total Entres:</strong> {totals.totalEntres} |
-                <strong> Credits Found:</strong> {creditsData.length} |
-                <strong> Has Report Data:</strong> {hasReportData ? 'Yes' : 'No'}
-              </p>
-              {adjustmentsFound === 0 && (
-                <p className="mt-1 text-yellow-600">
-                  ⚠️ No stock adjustments found for this date. Make sure you've submitted solde entries in Sales Management for today.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* First Day Notice */}
-      {isFirstDay && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex">
-            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                First Day Notice
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>
-                  This appears to be the first day of operations or the selected date has no previous day data. 
-                  All stock values are set to 0 as there is no previous day's solde to reference.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Entres Information */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div className="flex">
-          <Package className="h-5 w-5 text-green-400 mt-0.5" />
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-green-800">
-              Entres (New Stock Entries)
-            </h3>
-            <div className="mt-2 text-sm text-green-700">
-              <p>
-                The "Entres" column shows all new stock that entered your inventory today, including:
-              </p>
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>Initial quantities when adding new products</li>
-                <li>Stock increases from inventory adjustments</li>
-                <li>Solde adjustments from Sales Management (increase type only)</li>
-                <li>New stock received from suppliers</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Report Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -656,9 +673,9 @@ export default function DailyReports() {
         </div>
       </div>
 
-      {/* Main Content Grid - Daily Report Table and Credit Table */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Daily Report Table - Takes 2/3 of the space */}
+        {/* Daily Report Table */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -669,8 +686,8 @@ export default function DailyReports() {
                   </h2>
                   <p className="text-sm text-gray-600">
                     Generated by {user?.full_name} • {reportData.length} products
-                    {isFirstDay && <span className="text-blue-600 ml-2">• First Day</span>}
-                    {adjustmentsFound > 0 && <span className="text-green-600 ml-2">• {adjustmentsFound} adjustments</span>}
+                    {useStoredData && <span className="text-green-600 ml-2">• Stored Report</span>}
+                    {!useStoredData && <span className="text-blue-600 ml-2">• Live Report</span>}
                   </p>
                 </div>
                 <FileText className="h-6 w-6 text-blue-600" />
@@ -774,7 +791,7 @@ export default function DailyReports() {
                     ))}
                   </tbody>
                   
-                  {/* Summary Row - Fixed Calculations */}
+                  {/* Summary Row */}
                   <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                     <tr className="font-semibold">
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
@@ -817,7 +834,7 @@ export default function DailyReports() {
           </div>
         </div>
 
-        {/* Credit Table (DETTE) - Takes 1/3 of the space */}
+        {/* Credit Table */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-orange-50">
@@ -889,19 +906,6 @@ export default function DailyReports() {
                 </table>
               </div>
             )}
-
-            {/* Credit Information */}
-            <div className="px-6 py-4 bg-orange-50 border-t border-orange-200">
-              <div className="text-sm text-orange-700">
-                <p className="font-medium mb-1">📋 Credit Information</p>
-                <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>Shows all credits issued on the selected date</li>
-                  <li>Customer names from Credit Panel records</li>
-                  <li>Amounts match Credit Panel data</li>
-                  <li>Data synced with Credit Management system</li>
-                </ul>
-              </div>
-            </div>
           </div>
         </div>
       </div>
