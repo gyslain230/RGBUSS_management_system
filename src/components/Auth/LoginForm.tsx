@@ -8,9 +8,9 @@ export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const { signIn } = useAuth();
+  const { signIn, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -34,24 +34,30 @@ export default function LoginForm() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
       console.log('LoginForm: Starting sign in process...');
       await signIn(email.trim(), password);
       
-      // Add a small delay to allow auth state to update
+      // Wait for auth state to update, then navigate
+      console.log('LoginForm: Sign in initiated, waiting for auth state...');
+      
+      // Use a timeout to navigate after auth state should have updated
       setTimeout(() => {
         console.log('LoginForm: Navigating to:', from);
         navigate(from, { replace: true });
-      }, 1000);
+      }, 2000);
       
     } catch (error: any) {
       console.error('LoginForm: Login error:', error);
       // Error handling is done in AuthContext with specific messages
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
+
+  // Show loading state if either form is submitting or auth is loading
+  const isLoading = submitting || authLoading;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -89,7 +95,7 @@ export default function LoginForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
+                  disabled={isLoading}
                   className="pl-10 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your email address"
                 />
@@ -108,7 +114,7 @@ export default function LoginForm() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={isLoading}
                   className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                 />
@@ -116,7 +122,7 @@ export default function LoginForm() {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400" />
@@ -131,13 +137,13 @@ export default function LoginForm() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
             >
-              {loading ? (
+              {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Signing in...
+                  {submitting ? 'Signing in...' : 'Loading profile...'}
                 </div>
               ) : (
                 'Sign in'
@@ -158,25 +164,47 @@ export default function LoginForm() {
           </div>
         </form>
 
-        {/* Connection Status */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                Authentication Tips
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Make sure you have a stable internet connection</li>
-                  <li>If login is slow, please wait - the system is processing your request</li>
-                  <li>Create an account first if you don't have one</li>
-                  <li>Contact your administrator if you continue having issues</li>
-                </ul>
+        {/* Loading Status */}
+        {isLoading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mt-0.5"></div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  {submitting ? 'Authenticating...' : 'Loading your profile...'}
+                </h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  {submitting 
+                    ? 'Verifying your credentials with the server...' 
+                    : 'Setting up your dashboard and permissions...'
+                  }
+                </p>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Connection Status */}
+        {!isLoading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  Authentication Tips
+                </h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Make sure you have a stable internet connection</li>
+                    <li>If login is slow, please wait - the system is processing your request</li>
+                    <li>Create an account first if you don't have one</li>
+                    <li>Contact your administrator if you continue having issues</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Development credentials info */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">

@@ -94,24 +94,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    // Listen for auth changes
+    // Listen for auth changes with timeout protection
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
+      
+      // Set a timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        console.warn('AuthProvider: Profile loading timeout, clearing loading state');
+        setLoading(false);
+      }, 10000); // 10 second timeout
       
       try {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('AuthProvider: User signed in:', session.user.email);
           
           try {
-            const profile = await getCurrentUser();
+            // Add retry logic for profile loading
+            let retries = 3;
+            let profile = null;
             
-            if (profile) {
-              setUser(profile);
-              console.log('AuthProvider: Profile loaded after sign in:', profile.email);
-            } else {
-              console.error('AuthProvider: No profile found after sign in');
-              toast.error('Profile not found. Please contact administrator.');
+            while (retries > 0 && !profile) {
+              try {
+                console.log(`AuthProvider: Attempting to load profile (${4 - retries}/3)...`);
+                profile = await getCurrentUser();
+                
+                if (profile) {
+                  setUser(profile);
+                  console.log('AuthProvider: Profile loaded after sign in:', profile.email);
+                  clearTimeout(timeoutId);
+                  setLoading(false);
+                  return;
+                }
+              } catch (profileError: any) {
+                console.error(`AuthProvider: Profile loading attempt ${4 - retries} failed:`, profileError);
+                retries--;
+                
+                if (retries > 0) {
+                  // Wait before retrying
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+              }
             }
+            
+            // If we get here, all retries failed
+            console.error('AuthProvider: Failed to load profile after all retries');
+            toast.error('Error loading user profile. Please try refreshing the page.');
+            
           } catch (profileError: any) {
             console.error('AuthProvider: Error loading profile after sign in:', profileError);
             
@@ -125,10 +153,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           console.log('AuthProvider: User signed out');
+          clearTimeout(timeoutId);
+          setLoading(false);
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('AuthProvider: Token refreshed');
+          clearTimeout(timeoutId);
+          // Don't change loading state for token refresh
         }
       } catch (error) {
         console.error('AuthProvider: Error in auth state change handler:', error);
       } finally {
+        clearTimeout(timeoutId);
         setLoading(false);
       }
     });
@@ -146,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('AuthProvider: Attempting to sign in with email:', email);
+      setLoading(true);
       
       const { user: authUser } = await signInWithEmail(email, password);
       
@@ -153,10 +189,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Authentication failed - no user returned');
       }
 
-      console.log('AuthProvider: Sign in successful, waiting for profile...');
+      console.log('AuthProvider: Sign in successful, auth state change will handle profile loading');
       toast.success('Signing in...');
+      
+      // Don't set loading to false here - let the auth state change handler do it
+      // The auth state change handler will load the profile and clear loading
+      
     } catch (error: any) {
       console.error('AuthProvider: Sign in failed:', error);
+      setLoading(false); // Clear loading on error
       
       // Handle specific Supabase auth errors
       let errorMessage = 'Login failed. Please try again.';
@@ -233,12 +274,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseReady()) {
       console.warn('Supabase not configured, clearing local state only');
       setUser(null);
+      setLoading(false);
       toast.success('Signed out successfully!');
       return;
     }
 
     try {
       console.log('AuthProvider: Signing out...');
+      setLoading(true);
       
       await supabaseSignOut();
       
@@ -251,6 +294,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       toast.error(error.message || 'Sign out failed. Please try again.');
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
