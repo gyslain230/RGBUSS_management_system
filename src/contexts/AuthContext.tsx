@@ -114,6 +114,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Please verify your phone number before signing in.';
       } else if (error.message?.includes('Too many requests')) {
         errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+      } else if (error.message?.includes('User not found')) {
+        errorMessage = 'No account found with this phone number. Please contact your administrator to create an account.';
+      } else if (error.message?.includes('Signup not allowed')) {
+        errorMessage = 'Account creation is restricted. Please contact your administrator.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -155,6 +159,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Password must be at least 6 characters long.';
       } else if (error.message?.includes('Invalid phone number')) {
         errorMessage = 'Please enter a valid phone number with country code (e.g., +1234567890).';
+      } else if (error.message?.includes('Signup not allowed')) {
+        errorMessage = 'Account creation is currently restricted. Please contact your administrator.';
       } else if (error.message) {
         errorMessage = error.message;
       }
