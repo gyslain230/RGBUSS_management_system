@@ -36,21 +36,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('AuthProvider: Initializing...');
     
-    // Get initial session with timeout
+    // Get initial session
     const getInitialSession = async () => {
       try {
         console.log('AuthProvider: Checking for existing session...');
         
-        // Add timeout to prevent hanging
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session check timeout')), 10000)
-        );
-        
-        const { data: { session }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as any;
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
@@ -61,16 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           console.log('AuthProvider: Found existing session for user:', session.user.email);
           try {
-            // Add timeout for profile loading too
-            const profilePromise = getCurrentUser();
-            const profileTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Profile loading timeout')), 8000)
-            );
-            
-            const profile = await Promise.race([
-              profilePromise,
-              profileTimeoutPromise
-            ]) as any;
+            const profile = await getCurrentUser();
             
             if (profile) {
               setUser(profile);
@@ -80,7 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           } catch (profileError) {
             console.error('AuthProvider: Error loading user profile:', profileError);
-            // Don't fail completely, just log the error
           }
         } else {
           console.log('AuthProvider: No existing session found');
@@ -94,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    // Listen for auth changes with error handling
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
       
@@ -102,17 +83,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('AuthProvider: User signed in:', session.user.email);
           
-          // Add timeout for profile loading
-          const profilePromise = getCurrentUser();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Profile loading timeout after sign in')), 8000)
-          );
-          
           try {
-            const profile = await Promise.race([
-              profilePromise,
-              timeoutPromise
-            ]) as any;
+            const profile = await getCurrentUser();
             
             if (profile) {
               setUser(profile);
@@ -132,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('AuthProvider: Error in auth state change handler:', error);
       } finally {
-        // Always set loading to false after auth state change
         setLoading(false);
       }
     });
@@ -146,23 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('AuthProvider: Attempting to sign in with email:', email);
       
-      // Add timeout to sign in process
-      const signInPromise = signInWithEmail(email, password);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign in timeout')), 15000)
-      );
-      
-      const { user: authUser } = await Promise.race([
-        signInPromise,
-        timeoutPromise
-      ]) as any;
+      const { user: authUser } = await signInWithEmail(email, password);
       
       if (!authUser) {
         throw new Error('Authentication failed - no user returned');
       }
 
-      // Profile loading will be handled by the auth state change listener
-      // Don't load profile here to avoid duplicate calls
       console.log('AuthProvider: Sign in successful, waiting for profile...');
       toast.success('Signing in...');
     } catch (error: any) {
@@ -177,8 +137,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Please verify your email address before signing in.';
       } else if (error.message?.includes('Too many requests')) {
         errorMessage = 'Too many login attempts. Please wait a moment and try again.';
-      } else if (error.message?.includes('timeout')) {
-        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
       } else if (error.message?.includes('User not found')) {
         errorMessage = 'No account found with this email address. Please contact your administrator to create an account.';
       } else if (error.message?.includes('Signup not allowed')) {
@@ -196,21 +154,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('AuthProvider: Attempting to sign up with email:', email, 'role:', role);
       
-      // Add timeout to sign up process
-      const signUpPromise = signUpWithEmail(
+      const { user: authUser } = await signUpWithEmail(
         email, 
         password, 
         fullName, 
         role as 'admin' | 'manager' | 'worker'
       );
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign up timeout')), 20000)
-      );
-      
-      const { user: authUser } = await Promise.race([
-        signUpPromise,
-        timeoutPromise
-      ]) as any;
 
       if (!authUser) {
         throw new Error('User creation failed');
@@ -232,8 +181,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Please enter a valid email address.';
       } else if (error.message?.includes('Signup not allowed')) {
         errorMessage = 'Account creation is currently restricted. Please contact your administrator.';
-      } else if (error.message?.includes('timeout')) {
-        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -247,13 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('AuthProvider: Signing out...');
       
-      // Add timeout to sign out
-      const signOutPromise = supabaseSignOut();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign out timeout')), 10000)
-      );
-      
-      await Promise.race([signOutPromise, timeoutPromise]);
+      await supabaseSignOut();
       
       setUser(null);
       console.log('AuthProvider: Successfully signed out');

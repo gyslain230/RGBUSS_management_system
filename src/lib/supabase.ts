@@ -136,18 +136,22 @@ export const getCurrentUser = async () => {
   }
 
   try {
+    console.log('getCurrentUser: Getting authenticated user...');
     const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
     if (userError) {
-      console.error('Error getting auth user:', userError);
+      console.error('getCurrentUser: Error getting auth user:', userError);
       return null;
     }
     
     if (!user) {
-      console.log('No authenticated user found');
+      console.log('getCurrentUser: No authenticated user found');
       return null;
     }
 
-    console.log('Getting profile for user:', user.id);
+    console.log('getCurrentUser: Getting profile for user:', user.id);
+    
+    // Use a more robust query with better error handling
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -155,13 +159,30 @@ export const getCurrentUser = async () => {
       .single();
 
     if (profileError) {
-      console.error('Error getting user profile:', profileError);
+      console.error('getCurrentUser: Error getting user profile:', profileError);
+      
+      // Provide more specific error information
+      if (profileError.code === 'PGRST116') {
+        console.error('getCurrentUser: No profile found for user ID:', user.id);
+        return null;
+      } else if (profileError.code === '42501') {
+        console.error('getCurrentUser: Permission denied accessing profile');
+        return null;
+      } else {
+        console.error('getCurrentUser: Database error:', profileError.message);
+        return null;
+      }
+    }
+
+    if (!profile) {
+      console.error('getCurrentUser: Profile query returned null');
       return null;
     }
 
+    console.log('getCurrentUser: Profile loaded successfully:', profile.email);
     return profile;
   } catch (error) {
-    console.error('Error in getCurrentUser:', error);
+    console.error('getCurrentUser: Unexpected error:', error);
     return null;
   }
 };
