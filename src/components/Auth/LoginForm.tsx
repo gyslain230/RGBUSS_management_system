@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, Mail, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Store, Mail, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isSupabaseReady } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
 export default function LoginForm() {
@@ -10,11 +11,19 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const { signIn, loading: authLoading } = useAuth();
+  const { signIn, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // If user is already authenticated, redirect
+  React.useEffect(() => {
+    if (user && !authLoading) {
+      console.log('LoginForm: User already authenticated, redirecting to:', from);
+      navigate(from, { replace: true });
+    }
+  }, [user, authLoading, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +43,11 @@ export default function LoginForm() {
       return;
     }
 
+    if (!isSupabaseReady()) {
+      toast.error('Authentication service not configured. Please set up Supabase.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       console.log('LoginForm: Starting sign in process...');
@@ -46,7 +60,7 @@ export default function LoginForm() {
       setTimeout(() => {
         console.log('LoginForm: Navigating to:', from);
         navigate(from, { replace: true });
-      }, 2000);
+      }, 3000);
       
     } catch (error: any) {
       console.error('LoginForm: Login error:', error);
@@ -77,6 +91,36 @@ export default function LoginForm() {
           </p>
         </div>
 
+        {/* Connection Status */}
+        <div className={`p-4 rounded-lg border ${
+          isSupabaseReady() 
+            ? 'bg-green-50 border-green-200' 
+            : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-center">
+            {isSupabaseReady() ? (
+              <Wifi className="h-5 w-5 text-green-600 mr-2" />
+            ) : (
+              <WifiOff className="h-5 w-5 text-red-600 mr-2" />
+            )}
+            <div>
+              <p className={`text-sm font-medium ${
+                isSupabaseReady() ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {isSupabaseReady() ? 'Connected to Supabase' : 'Supabase Not Configured'}
+              </p>
+              <p className={`text-xs ${
+                isSupabaseReady() ? 'text-green-700' : 'text-red-700'
+              }`}>
+                {isSupabaseReady() 
+                  ? 'Authentication service is ready' 
+                  : 'Please set up your Supabase project'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
@@ -95,7 +139,7 @@ export default function LoginForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || !isSupabaseReady()}
                   className="pl-10 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your email address"
                 />
@@ -114,7 +158,7 @@ export default function LoginForm() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || !isSupabaseReady()}
                   className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                 />
@@ -122,7 +166,7 @@ export default function LoginForm() {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
+                  disabled={isLoading || !isSupabaseReady()}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400" />
@@ -137,7 +181,7 @@ export default function LoginForm() {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !isSupabaseReady()}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
             >
               {isLoading ? (
@@ -145,6 +189,8 @@ export default function LoginForm() {
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                   {submitting ? 'Signing in...' : 'Loading profile...'}
                 </div>
+              ) : !isSupabaseReady() ? (
+                'Supabase Not Configured'
               ) : (
                 'Sign in'
               )}
@@ -179,13 +225,16 @@ export default function LoginForm() {
                     : 'Setting up your dashboard and permissions...'
                   }
                 </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  This may take a few seconds. Please wait...
+                </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Connection Status */}
-        {!isLoading && (
+        {/* Authentication Tips */}
+        {!isLoading && isSupabaseReady() && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex">
               <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
@@ -206,23 +255,49 @@ export default function LoginForm() {
           </div>
         )}
 
-        {/* Development credentials info */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="text-sm text-green-700">
-            <p className="font-medium mb-1">🔧 For Testing</p>
-            <p className="text-xs">
-              Create an account using the Register page, then sign in here.
-            </p>
-            <div className="mt-2">
-              <Link
-                to="/register"
-                className="text-green-600 hover:text-green-800 text-sm font-medium"
-              >
-                Go to Registration →
-              </Link>
+        {/* Supabase Configuration Warning */}
+        {!isSupabaseReady() && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Supabase Configuration Required
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>
+                    The authentication service is not configured. Please set up your Supabase project:
+                  </p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Click "Connect to Supabase" in the top right corner</li>
+                    <li>Or configure your environment variables manually</li>
+                    <li>Ensure your Supabase URL and API key are correct</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Development credentials info */}
+        {isSupabaseReady() && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="text-sm text-green-700">
+              <p className="font-medium mb-1">🔧 For Testing</p>
+              <p className="text-xs">
+                Create an account using the Register page, then sign in here.
+              </p>
+              <div className="mt-2">
+                <Link
+                  to="/register"
+                  className="text-green-600 hover:text-green-800 text-sm font-medium"
+                >
+                  Go to Registration →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

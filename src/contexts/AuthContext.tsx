@@ -43,18 +43,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    // Get initial session
+    // Get initial session with timeout
     const getInitialSession = async () => {
       try {
         console.log('AuthProvider: Checking for existing session...');
         
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session check timeout')), 10000);
+        });
+
+        const sessionPromise = supabase.auth.getSession();
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
           
           // Handle network errors gracefully
-          if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
+          if (error.message?.includes('Failed to fetch') || 
+              error.message?.includes('fetch') ||
+              error.message?.includes('network') ||
+              error.message?.includes('timeout')) {
             console.error('AuthProvider: Network error - Supabase may not be accessible');
             toast.error('Unable to connect to authentication service. Please check your connection.');
           }
@@ -78,15 +87,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('AuthProvider: Error loading user profile:', profileError);
             
             // Handle configuration errors
-            if (profileError.message?.includes('Supabase configuration')) {
+            if (profileError.message?.includes('Supabase configuration') ||
+                profileError.message?.includes('authentication service') ||
+                profileError.message?.includes('database service')) {
               toast.error('Database connection error. Please check your Supabase configuration.');
             }
           }
         } else {
           console.log('AuthProvider: No existing session found');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('AuthProvider: Error during initialization:', error);
+        
+        if (error.message?.includes('timeout')) {
+          toast.error('Connection timeout. Please check your internet connection.');
+        }
       } finally {
         setLoading(false);
       }
@@ -94,29 +109,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    // Listen for auth changes with timeout protection
+    // Listen for auth changes with comprehensive error handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
       
       // Set a timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
-        console.warn('AuthProvider: Profile loading timeout, clearing loading state');
+        console.warn('AuthProvider: Auth state change timeout, clearing loading state');
         setLoading(false);
-      }, 10000); // 10 second timeout
+      }, 15000); // 15 second timeout
       
       try {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('AuthProvider: User signed in:', session.user.email);
+          setLoading(true); // Set loading for profile fetch
           
           try {
-            // Add retry logic for profile loading
-            let retries = 3;
+            // Add retry logic for profile loading with shorter timeouts
+            let retries = 2;
             let profile = null;
             
             while (retries > 0 && !profile) {
               try {
-                console.log(`AuthProvider: Attempting to load profile (${4 - retries}/3)...`);
-                profile = await getCurrentUser();
+                console.log(`AuthProvider: Attempting to load profile (${3 - retries}/2)...`);
+                
+                // Add timeout for each profile loading attempt
+                const profilePromise = getCurrentUser();
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                  setTimeout(() => reject(new Error('Profile loading timeout')), 8000);
+                });
+                
+                profile = await Promise.race([profilePromise, timeoutPromise]);
                 
                 if (profile) {
                   setUser(profile);
@@ -126,29 +149,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   return;
                 }
               } catch (profileError: any) {
-                console.error(`AuthProvider: Profile loading attempt ${4 - retries} failed:`, profileError);
+                console.error(`AuthProvider: Profile loading attempt ${3 - retries} failed:`, profileError);
                 retries--;
                 
                 if (retries > 0) {
                   // Wait before retrying
-                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                } else {
+                  // Last attempt failed
+                  console.error('AuthProvider: All profile loading attempts failed');
+                  
+                  if (profileError.message?.includes('timeout')) {
+                    toast.error('Profile loading timed out. Please refresh the page.');
+                  } else if (profileError.message?.includes('Supabase configuration') ||
+                           profileError.message?.includes('authentication service') ||
+                           profileError.message?.includes('database service')) {
+                    toast.error('Database connection error. Please check your Supabase configuration.');
+                  } else {
+                    toast.error('Error loading user profile. Please try refreshing the page.');
+                  }
                 }
               }
             }
             
-            // If we get here, all retries failed
-            console.error('AuthProvider: Failed to load profile after all retries');
-            toast.error('Error loading user profile. Please try refreshing the page.');
-            
           } catch (profileError: any) {
-            console.error('AuthProvider: Error loading profile after sign in:', profileError);
-            
-            // Handle configuration errors
-            if (profileError.message?.includes('Supabase configuration')) {
-              toast.error('Database connection error. Please check your Supabase configuration.');
-            } else {
-              toast.error('Error loading user profile. Please try again.');
-            }
+            console.error('AuthProvider: Error in profile loading logic:', profileError);
+            toast.error('Error loading user profile. Please try again.');
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -159,10 +185,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('AuthProvider: Token refreshed');
           clearTimeout(timeoutId);
           // Don't change loading state for token refresh
+        } else {
+          // Handle other events
+          clearTimeout(timeoutId);
+          setLoading(false);
         }
       } catch (error) {
         console.error('AuthProvider: Error in auth state change handler:', error);
-      } finally {
         clearTimeout(timeoutId);
         setLoading(false);
       }
@@ -181,7 +210,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('AuthProvider: Attempting to sign in with email:', email);
-      setLoading(true);
       
       const { user: authUser } = await signInWithEmail(email, password);
       
@@ -192,12 +220,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('AuthProvider: Sign in successful, auth state change will handle profile loading');
       toast.success('Signing in...');
       
-      // Don't set loading to false here - let the auth state change handler do it
-      // The auth state change handler will load the profile and clear loading
+      // Don't set loading here - let the auth state change handler manage it
       
     } catch (error: any) {
       console.error('AuthProvider: Sign in failed:', error);
-      setLoading(false); // Clear loading on error
       
       // Handle specific Supabase auth errors
       let errorMessage = 'Login failed. Please try again.';
@@ -214,6 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Account creation is restricted. Please contact your administrator.';
       } else if (error.message?.includes('Supabase not configured')) {
         errorMessage = 'Authentication service not configured. Please set up Supabase.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+      } else if (error.message?.includes('authentication service')) {
+        errorMessage = 'Unable to connect to authentication service. Please check your internet connection.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -261,6 +291,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Account creation is currently restricted. Please contact your administrator.';
       } else if (error.message?.includes('Supabase not configured')) {
         errorMessage = 'Authentication service not configured. Please set up Supabase.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else if (error.message?.includes('authentication service') ||
+                 error.message?.includes('database service')) {
+        errorMessage = 'Unable to connect to service. Please check your internet connection.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -281,21 +316,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('AuthProvider: Signing out...');
-      setLoading(true);
       
       await supabaseSignOut();
       
       setUser(null);
+      setLoading(false);
       console.log('AuthProvider: Successfully signed out');
       toast.success('Signed out successfully!');
     } catch (error: any) {
       console.error('AuthProvider: Sign out failed:', error);
       // Even if sign out fails, clear the local user state
       setUser(null);
+      setLoading(false);
       toast.error(error.message || 'Sign out failed. Please try again.');
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 

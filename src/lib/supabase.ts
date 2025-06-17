@@ -131,8 +131,8 @@ export interface DailyReport {
   created_by: string;
 }
 
-// Auth helper functions
-export const getCurrentUser = async () => {
+// Auth helper functions with comprehensive error handling
+export const getCurrentUser = async (): Promise<User | null> => {
   if (!isSupabaseConfigured) {
     console.warn('getCurrentUser: Supabase not configured');
     return null;
@@ -140,15 +140,25 @@ export const getCurrentUser = async () => {
 
   try {
     console.log('getCurrentUser: Getting authenticated user...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), 10000);
+    });
+
+    const userPromise = supabase.auth.getUser();
+    const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
     
     if (userError) {
       console.error('getCurrentUser: Error getting auth user:', userError);
       
       // Handle specific network errors
-      if (userError.message?.includes('Failed to fetch') || userError.message?.includes('fetch')) {
+      if (userError.message?.includes('Failed to fetch') || 
+          userError.message?.includes('fetch') ||
+          userError.message?.includes('timeout') ||
+          userError.message?.includes('network')) {
         console.error('getCurrentUser: Network error - Supabase may not be properly configured or accessible');
-        throw new Error('Unable to connect to authentication service. Please check your Supabase configuration.');
+        throw new Error('Unable to connect to authentication service. Please check your internet connection and Supabase configuration.');
       }
       
       return null;
@@ -161,26 +171,55 @@ export const getCurrentUser = async () => {
 
     console.log('getCurrentUser: Getting profile for user:', user.id);
     
-    // Use a more robust query with better error handling
-    const { data: profile, error: profileError } = await supabase
+    // Use a more robust query with timeout
+    const profilePromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
+    const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
+
     if (profileError) {
       console.error('getCurrentUser: Error getting user profile:', profileError);
       
       // Handle network errors for profile fetch
-      if (profileError.message?.includes('Failed to fetch') || profileError.message?.includes('fetch')) {
+      if (profileError.message?.includes('Failed to fetch') || 
+          profileError.message?.includes('fetch') ||
+          profileError.message?.includes('timeout') ||
+          profileError.message?.includes('network')) {
         console.error('getCurrentUser: Network error fetching profile - Supabase may not be properly configured');
-        throw new Error('Unable to connect to database service. Please check your Supabase configuration.');
+        throw new Error('Unable to connect to database service. Please check your internet connection and Supabase configuration.');
       }
       
-      // Provide more specific error information
+      // Handle specific database errors
       if (profileError.code === 'PGRST116') {
         console.error('getCurrentUser: No profile found for user ID:', user.id);
-        return null;
+        // Try to create profile if it doesn't exist
+        try {
+          console.log('getCurrentUser: Attempting to create missing profile...');
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{
+              id: user.id,
+              email: user.email || '',
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+              role: 'worker'
+            }])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('getCurrentUser: Failed to create profile:', createError);
+            return null;
+          }
+
+          console.log('getCurrentUser: Profile created successfully:', newProfile);
+          return newProfile;
+        } catch (createError) {
+          console.error('getCurrentUser: Error creating profile:', createError);
+          return null;
+        }
       } else if (profileError.code === '42501') {
         console.error('getCurrentUser: Permission denied accessing profile');
         return null;
@@ -201,8 +240,15 @@ export const getCurrentUser = async () => {
     console.error('getCurrentUser: Unexpected error:', error);
     
     // Re-throw network configuration errors
-    if (error.message?.includes('Supabase configuration')) {
+    if (error.message?.includes('Supabase configuration') || 
+        error.message?.includes('authentication service') ||
+        error.message?.includes('database service')) {
       throw error;
+    }
+    
+    // Handle timeout errors
+    if (error.message?.includes('timeout')) {
+      throw new Error('Request timed out. Please check your internet connection and try again.');
     }
     
     return null;
@@ -216,18 +262,43 @@ export const signInWithEmail = async (email: string, password: string) => {
 
   console.log('Attempting to sign in with email:', email);
   
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Sign in request timeout')), 15000);
+    });
 
-  if (error) {
-    console.error('Sign in error:', error);
+    const signInPromise = supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
+
+    if (error) {
+      console.error('Sign in error:', error);
+      
+      // Handle network errors
+      if (error.message?.includes('Failed to fetch') || 
+          error.message?.includes('fetch') ||
+          error.message?.includes('network')) {
+        throw new Error('Unable to connect to authentication service. Please check your internet connection.');
+      }
+      
+      throw error;
+    }
+
+    console.log('Sign in successful for:', email);
+    return data;
+  } catch (error: any) {
+    console.error('signInWithEmail error:', error);
+    
+    if (error.message?.includes('timeout')) {
+      throw new Error('Sign in request timed out. Please check your internet connection and try again.');
+    }
+    
     throw error;
   }
-
-  console.log('Sign in successful for:', email);
-  return data;
 };
 
 export const signUpWithEmail = async (email: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
@@ -238,8 +309,13 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
   try {
     console.log('Creating user account for:', email, 'with role:', role);
     
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Sign up request timeout')), 20000);
+    });
+
     // Create the auth user with metadata
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const signUpPromise = supabase.auth.signUp({
       email,
       password,
       options: {
@@ -250,8 +326,18 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
       }
     });
 
+    const { data: authData, error: authError } = await Promise.race([signUpPromise, timeoutPromise]);
+
     if (authError) {
       console.error('Auth signup error:', authError);
+      
+      // Handle network errors
+      if (authError.message?.includes('Failed to fetch') || 
+          authError.message?.includes('fetch') ||
+          authError.message?.includes('network')) {
+        throw new Error('Unable to connect to authentication service. Please check your internet connection.');
+      }
+      
       throw new Error(`Authentication error: ${authError.message}`);
     }
 
@@ -262,16 +348,21 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     console.log('Auth user created successfully:', authData.user.id);
 
     // Wait a moment for any triggers to process
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Check if profile was created by trigger
-    const { data: existingProfile, error: profileCheckError } = await supabase
+    const profileCheckPromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', authData.user.id)
       .maybeSingle();
 
-    if (profileCheckError) {
+    const { data: existingProfile, error: profileCheckError } = await Promise.race([
+      profileCheckPromise, 
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Profile check timeout')), 10000))
+    ]);
+
+    if (profileCheckError && !profileCheckError.message?.includes('timeout')) {
       console.error('Error checking for existing profile:', profileCheckError);
       // Don't throw here, continue to manual creation
     }
@@ -291,14 +382,27 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
 
       console.log('Inserting profile data:', profileData);
 
-      const { data: newProfile, error: profileError } = await supabase
+      const profileInsertPromise = supabase
         .from('profiles')
         .insert([profileData])
         .select()
         .single();
 
+      const { data: newProfile, error: profileError } = await Promise.race([
+        profileInsertPromise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Profile creation timeout')), 10000))
+      ]);
+
       if (profileError) {
         console.error('Error creating profile manually:', profileError);
+        
+        // Handle network errors
+        if (profileError.message?.includes('Failed to fetch') || 
+            profileError.message?.includes('fetch') ||
+            profileError.message?.includes('network') ||
+            profileError.message?.includes('timeout')) {
+          throw new Error('Unable to connect to database service. Please check your internet connection.');
+        }
         
         // Provide more specific error information
         if (profileError.code === '23505') {
@@ -318,6 +422,11 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     }
   } catch (error: any) {
     console.error('SignUp error:', error);
+    
+    // Handle timeout errors
+    if (error.message?.includes('timeout')) {
+      throw new Error('Request timed out. Please check your internet connection and try again.');
+    }
     
     // Provide user-friendly error messages
     if (error.message?.includes('User already registered')) {
@@ -340,8 +449,19 @@ export const signOut = async () => {
     return;
   }
 
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Sign out timeout')), 5000);
+    });
+
+    const signOutPromise = supabase.auth.signOut();
+    const { error } = await Promise.race([signOutPromise, timeoutPromise]);
+    
+    if (error) throw error;
+  } catch (error: any) {
+    console.error('Sign out error:', error);
+    // Don't throw sign out errors, just log them
+  }
 };
 
 // Utility functions for data operations
