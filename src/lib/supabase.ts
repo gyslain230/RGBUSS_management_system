@@ -185,7 +185,6 @@ class MockTable {
     try {
       const items = localStorage.getItem(this.table);
       const parsedItems = items ? JSON.parse(items) : [];
-      console.log(`📖 Reading from localStorage table: ${this.table}, found ${parsedItems.length} items`);
       return parsedItems;
     } catch (error) {
       console.error(`❌ Error reading from localStorage table: ${this.table}`, error);
@@ -196,7 +195,6 @@ class MockTable {
   private setItems(items: any[]): void {
     try {
       localStorage.setItem(this.table, JSON.stringify(items));
-      console.log(`💾 Saved to localStorage table: ${this.table}, ${items.length} items`);
     } catch (error) {
       console.error(`❌ Error saving to localStorage table: ${this.table}`, error);
     }
@@ -205,49 +203,35 @@ class MockTable {
   private executeQuery(): Promise<{ data: any[] | null; error: any }> {
     return new Promise((resolve) => {
       try {
-        console.log(`🔍 Executing query on table: ${this.table}`, this.query);
         let items = this.getItems();
 
         // Apply filters
         if (this.query.eq) {
-          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.eq.column] === this.query.eq.value);
-          console.log(`🔍 Filter eq(${this.query.eq.column}, ${this.query.eq.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.gt) {
-          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.gt.column] > this.query.gt.value);
-          console.log(`🔍 Filter gt(${this.query.gt.column}, ${this.query.gt.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.gte) {
-          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.gte.column] >= this.query.gte.value);
-          console.log(`🔍 Filter gte(${this.query.gte.column}, ${this.query.gte.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.lt) {
-          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.lt.column] < this.query.lt.value);
-          console.log(`🔍 Filter lt(${this.query.lt.column}, ${this.query.lt.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         if (this.query.lte) {
-          const beforeFilter = items.length;
           items = items.filter(item => item[this.query.lte.column] <= this.query.lte.value);
-          console.log(`🔍 Filter lte(${this.query.lte.column}, ${this.query.lte.value}): ${beforeFilter} → ${items.length} items`);
         }
 
         // Apply updates
         if (this.query.update && this.query.eq) {
-          console.log(`📝 UPDATE operation on table: ${this.table}`, this.query.update);
           const originalItems = this.getItems();
           const updatedItems = originalItems.map(item => {
             if (item[this.query.eq.column] === this.query.eq.value) {
-              const updatedItem = { ...item, ...this.query.update, updated_at: new Date().toISOString() };
-              console.log(`✏️ Updated item:`, updatedItem);
-              return updatedItem;
+              return { ...item, ...this.query.update, updated_at: new Date().toISOString() };
             }
             return item;
           });
@@ -257,11 +241,9 @@ class MockTable {
 
         // Apply deletes
         if (this.query.delete && this.query.eq) {
-          console.log(`🗑️ DELETE operation on table: ${this.table}`);
           const originalItems = this.getItems();
           const remainingItems = originalItems.filter(item => item[this.query.eq.column] !== this.query.eq.value);
           this.setItems(remainingItems);
-          console.log(`🗑️ Deleted items, remaining: ${remainingItems.length}`);
           items = [];
         }
 
@@ -276,16 +258,13 @@ class MockTable {
             }
             return aVal > bVal ? 1 : -1;
           });
-          console.log(`📊 Ordered by ${this.query.order.column} (${this.query.order.ascending === false ? 'desc' : 'asc'})`);
         }
 
         // Apply limit
         if (this.query.limit) {
           items = items.slice(0, this.query.limit);
-          console.log(`📏 Limited to ${this.query.limit} items`);
         }
 
-        console.log(`✅ Query completed, returning ${items.length} items`);
         resolve({ data: items, error: null });
       } catch (error) {
         console.error(`❌ Query error on table: ${this.table}`, error);
@@ -297,11 +276,10 @@ class MockTable {
 
 export const supabase = new MockSupabaseClient();
 
-// Initialize with completely empty data for fresh restart
+// Initialize with empty data structure
 const initializeData = () => {
   console.log('🔄 Initializing localStorage data structure...');
   
-  // Define all required tables
   const tables = [
     'products',
     'sales', 
@@ -311,25 +289,15 @@ const initializeData = () => {
     'daily_reports'
   ];
 
-  // Initialize each table if it doesn't exist
   tables.forEach(table => {
     const existingData = localStorage.getItem(table);
     if (!existingData) {
       localStorage.setItem(table, JSON.stringify([]));
       console.log(`📊 Initialized empty table: ${table}`);
-    } else {
-      const data = JSON.parse(existingData);
-      console.log(`📊 Table ${table} already exists with ${data.length} items`);
     }
   });
   
   console.log('✅ LocalStorage initialization complete');
-  
-  // Log current state
-  tables.forEach(table => {
-    const data = JSON.parse(localStorage.getItem(table) || '[]');
-    console.log(`📈 ${table}: ${data.length} items`);
-  });
 };
 
 // Initialize data when module loads
