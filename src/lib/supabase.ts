@@ -135,16 +135,35 @@ export const getCurrentUser = async () => {
     return null;
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error getting auth user:', userError);
+      return null;
+    }
+    
+    if (!user) {
+      console.log('No authenticated user found');
+      return null;
+    }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+    console.log('Getting profile for user:', user.id);
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-  return profile;
+    if (profileError) {
+      console.error('Error getting user profile:', profileError);
+      return null;
+    }
+
+    return profile;
+  } catch (error) {
+    console.error('Error in getCurrentUser:', error);
+    return null;
+  }
 };
 
 export const signInWithEmail = async (email: string, password: string) => {
@@ -152,12 +171,19 @@ export const signInWithEmail = async (email: string, password: string) => {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
+  console.log('Attempting to sign in with email:', email);
+  
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Sign in error:', error);
+    throw error;
+  }
+
+  console.log('Sign in successful for:', email);
   return data;
 };
 
@@ -167,6 +193,8 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
   }
 
   try {
+    console.log('Creating user account for:', email);
+    
     // Create the auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -187,6 +215,8 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     if (!authData.user) {
       throw new Error('User creation failed - no user returned');
     }
+
+    console.log('Auth user created successfully:', authData.user.id);
 
     // Wait a moment for the trigger to process
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -219,17 +249,10 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
 
       if (profileError) {
         console.error('Error creating profile manually:', profileError);
-        
-        // Try to clean up the auth user if profile creation failed
-        try {
-          await supabase.auth.admin.deleteUser(authData.user.id);
-        } catch (cleanupError) {
-          console.error('Error cleaning up auth user:', cleanupError);
-        }
-        
         throw new Error(`Failed to create user profile: ${profileError.message}`);
       }
 
+      console.log('Profile created manually:', profileData);
       return { ...authData, profile: profileData };
     } else {
       console.log('Profile created successfully by trigger');

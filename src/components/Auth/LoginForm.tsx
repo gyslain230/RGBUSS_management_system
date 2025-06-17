@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, Mail } from 'lucide-react';
+import { Eye, EyeOff, Store, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -36,11 +36,18 @@ export default function LoginForm() {
 
     setLoading(true);
     try {
+      console.log('LoginForm: Starting sign in process...');
       await signIn(email.trim(), password);
-      navigate(from, { replace: true });
+      
+      // Add a small delay to allow auth state to update
+      setTimeout(() => {
+        console.log('LoginForm: Navigating to:', from);
+        navigate(from, { replace: true });
+      }, 1000);
+      
     } catch (error: any) {
+      console.error('LoginForm: Login error:', error);
       // Error handling is done in AuthContext with specific messages
-      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
@@ -82,7 +89,8 @@ export default function LoginForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  disabled={loading}
+                  className="pl-10 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your email address"
                 />
               </div>
@@ -100,13 +108,15 @@ export default function LoginForm() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  disabled={loading}
+                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400" />
@@ -125,7 +135,10 @@ export default function LoginForm() {
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
             >
               {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Signing in...
+                </div>
               ) : (
                 'Sign in'
               )}
@@ -134,20 +147,34 @@ export default function LoginForm() {
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Need an account? Contact your administrator to create one for you.
+              Need an account?{' '}
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
+              >
+                Create one here
+              </Link>
             </p>
           </div>
         </form>
 
-        {/* Information about email authentication */}
+        {/* Connection Status */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="text-sm text-blue-700">
-            <p className="font-medium mb-1">📧 Email Authentication</p>
-            <ul className="list-disc list-inside space-y-1 text-xs">
-              <li>Use your email address and password to sign in</li>
-              <li>Only administrators can create new user accounts</li>
-              <li>Contact your admin if you need access to the system</li>
-            </ul>
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">
+                Authentication Tips
+              </h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Make sure you have a stable internet connection</li>
+                  <li>If login is slow, please wait - the system is processing your request</li>
+                  <li>Create an account first if you don't have one</li>
+                  <li>Contact your administrator if you continue having issues</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
 
