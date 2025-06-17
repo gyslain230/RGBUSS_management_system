@@ -30,7 +30,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
 
     setLoading(true);
     try {
-      // Create the product first
+      // Create the product - always approved now
       const { data: productData, error: productError } = await supabase
         .from('products')
         .insert([{
@@ -39,7 +39,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
           quantity: data.quantity,
           category: data.category,
           description: data.description,
-          status: user.role === 'admin' ? 'approved' : 'pending',
+          status: 'approved', // Always approved
           created_by: user.id,
         }])
         .select()
@@ -47,8 +47,8 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
 
       if (productError) throw productError;
 
-      // If product is approved and has quantity > 0, record it as a stock adjustment (entres)
-      if (productData && (user.role === 'admin' || user.role === 'manager') && data.quantity > 0) {
+      // If product has quantity > 0, record it as a stock adjustment (entres)
+      if (productData && data.quantity > 0) {
         const { error: adjustmentError } = await supabase
           .from('stock_adjustments')
           .insert([{
@@ -69,11 +69,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
         }
       }
 
-      toast.success(
-        user.role === 'admin' 
-          ? `Product added successfully! ${data.quantity > 0 ? 'Initial stock recorded as entres.' : ''}` 
-          : 'Product submitted for approval!'
-      );
+      toast.success(`Product added successfully! ${data.quantity > 0 ? 'Initial stock recorded as entres.' : ''}`);
       
       reset();
       onSuccess();
@@ -205,7 +201,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
                 <p className="font-medium mb-1">📊 Daily Reports Integration</p>
                 <p>When you add this product with initial quantity, it will:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
-                  <li>Create the product in your inventory</li>
+                  <li>Create the product in your inventory (automatically approved)</li>
                   <li>Record the initial quantity as "entres" (new stock entries)</li>
                   <li>Appear in today's Daily Report with proper entres tracking</li>
                 </ul>

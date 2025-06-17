@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Check, X, Package, History, Settings, AlertTriangle, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Package, History, Settings, AlertTriangle } from 'lucide-react';
 import { supabase, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -18,7 +18,6 @@ export default function StockManagement() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchProducts();
@@ -26,14 +25,11 @@ export default function StockManagement() {
 
   const fetchProducts = async () => {
     try {
-      let query = supabase.from('products').select('*');
-
-      // Workers can only see approved products
-      if (user?.role === 'worker') {
-        query = query.eq('status', 'approved');
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+      // All products are now automatically approved, so we just fetch all products
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setProducts(data || []);
@@ -42,40 +38,6 @@ export default function StockManagement() {
       toast.error('Error loading products');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleApproveProduct = async (productId: string) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ status: 'approved' })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      toast.success('Product approved successfully');
-      fetchProducts();
-    } catch (error) {
-      console.error('Error approving product:', error);
-      toast.error('Error approving product');
-    }
-  };
-
-  const handleRejectProduct = async (productId: string) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      toast.success('Product rejected and removed');
-      fetchProducts();
-    } catch (error) {
-      console.error('Error rejecting product:', error);
-      toast.error('Error rejecting product');
     }
   };
 
@@ -92,9 +54,8 @@ export default function StockManagement() {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
     
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesSearch && matchesCategory;
   });
 
   const categories = Array.from(new Set(products.map(p => p.category)));
@@ -117,11 +78,9 @@ export default function StockManagement() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
           <p className="text-gray-600">Manage your inventory and product listings</p>
-          {(user?.role === 'worker' || user?.role === 'manager') && (
-            <p className="text-sm text-blue-600 mt-1">
-              ⚙️ You can adjust stock quantities for approved products
-            </p>
-          )}
+          <p className="text-sm text-green-600 mt-1">
+            ✅ All products are automatically approved and ready to use
+          </p>
         </div>
         <div className="flex items-center space-x-3">
           {/* Global History Button */}
@@ -134,15 +93,13 @@ export default function StockManagement() {
           </button>
           
           {/* Add Product Button */}
-          {(user?.role === 'admin' || user?.role === 'manager') && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </button>
         </div>
       </div>
 
@@ -180,18 +137,6 @@ export default function StockManagement() {
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
-
-            {user?.role === 'admin' && (
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All Status</option>
-                <option value="approved">Approved</option>
-                <option value="pending">Pending</option>
-              </select>
-            )}
           </div>
         </div>
       </div>
@@ -213,7 +158,7 @@ export default function StockManagement() {
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
             <p className="text-gray-600 mb-4">
-              {searchTerm || categoryFilter !== 'all' || statusFilter !== 'all'
+              {searchTerm || categoryFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Get started by adding your first product'
               }
@@ -235,9 +180,6 @@ export default function StockManagement() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Quantity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -269,11 +211,11 @@ export default function StockManagement() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-2">
                             <span className={`text-sm font-medium ${
-                              isLowStock && product.status === 'approved' ? 'text-red-600' : 'text-gray-900'
+                              isLowStock ? 'text-red-600' : 'text-gray-900'
                             }`}>
                               {product.quantity}
                             </span>
-                            {isLowStock && product.status === 'approved' && (
+                            {isLowStock && (
                               <div className="flex items-center">
                                 <AlertTriangle className="h-4 w-4 text-red-500" />
                                 <span className="text-xs text-red-500 ml-1">Low</span>
@@ -281,39 +223,10 @@ export default function StockManagement() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            product.status === 'approved' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {product.status === 'approved' ? 'Approved' : 'Pending'}
-                          </span>
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
-                            {/* Admin Actions for Pending Products */}
-                            {user?.role === 'admin' && product.status === 'pending' && (
-                              <>
-                                <button
-                                  onClick={() => handleApproveProduct(product.id)}
-                                  className="text-green-600 hover:text-green-900 transition-colors"
-                                  title="Approve product"
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleRejectProduct(product.id)}
-                                  className="text-red-600 hover:text-red-900 transition-colors"
-                                  title="Reject product"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </>
-                            )}
-
-                            {/* Stock Adjustment for Approved Products */}
-                            {canAdjustStock && product.status === 'approved' && (
+                            {/* Stock Adjustment */}
+                            {canAdjustStock && (
                               <button
                                 onClick={() => handleAdjustStock(product)}
                                 className="text-blue-600 hover:text-blue-900 transition-colors"
@@ -324,15 +237,13 @@ export default function StockManagement() {
                             )}
 
                             {/* History Button */}
-                            {product.status === 'approved' && (
-                              <button
-                                onClick={() => handleShowHistory(product.id)}
-                                className="text-gray-600 hover:text-gray-900 transition-colors"
-                                title="View adjustment history"
-                              >
-                                <History className="h-4 w-4" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleShowHistory(product.id)}
+                              className="text-gray-600 hover:text-gray-900 transition-colors"
+                              title="View adjustment history"
+                            >
+                              <History className="h-4 w-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -340,7 +251,7 @@ export default function StockManagement() {
                       {/* Product History Row */}
                       {showProductHistory === product.id && (
                         <tr>
-                          <td colSpan={6} className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                          <td colSpan={5} className="px-6 py-4 bg-gray-50 border-t border-gray-200">
                             <div className="max-w-full">
                               <StockAdjustmentHistory productId={product.id} />
                             </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X, Package, AlertTriangle, Settings, History } from 'lucide-react';
+import { Package, AlertTriangle, Settings, History } from 'lucide-react';
 import { Product } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import StockAdjustmentModal from './StockAdjustmentModal';
@@ -7,13 +7,11 @@ import StockAdjustmentHistory from './StockAdjustmentHistory';
 
 interface ProductCardProps {
   product: Product;
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
   onStockUpdated: () => void;
   canManage: boolean;
 }
 
-export default function ProductCard({ product, onApprove, onReject, onStockUpdated, canManage }: ProductCardProps) {
+export default function ProductCard({ product, onStockUpdated, canManage }: ProductCardProps) {
   const { user } = useAuth();
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -34,12 +32,7 @@ export default function ProductCard({ product, onApprove, onReject, onStockUpdat
             )}
           </div>
           <div className="flex items-center space-x-1">
-            {product.status === 'pending' && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                Pending
-              </span>
-            )}
-            {isLowStock && product.status === 'approved' && (
+            {isLowStock && (
               <AlertTriangle className="h-4 w-4 text-red-500" />
             )}
           </div>
@@ -56,11 +49,11 @@ export default function ProductCard({ product, onApprove, onReject, onStockUpdat
             <div className="flex items-center space-x-2">
               <span className={`font-semibold ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
                 {product.quantity}
-                {isLowStock && product.status === 'approved' && (
+                {isLowStock && (
                   <span className="text-xs text-red-500 ml-1">(Low)</span>
                 )}
               </span>
-              {canAdjustStock && product.status === 'approved' && (
+              {canAdjustStock && (
                 <button
                   onClick={() => setShowAdjustmentModal(true)}
                   className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
@@ -71,66 +64,33 @@ export default function ProductCard({ product, onApprove, onReject, onStockUpdat
               )}
             </div>
           </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Status:</span>
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-              product.status === 'approved' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {product.status === 'approved' ? 'Approved' : 'Pending'}
-            </span>
-          </div>
         </div>
 
         {/* Action Buttons */}
         <div className="mt-4 pt-4 border-t border-gray-200">
-          {/* Admin Actions for Pending Products */}
-          {canManage && product.status === 'pending' && (
-            <div className="flex space-x-2 mb-3">
-              <button
-                onClick={() => onApprove(product.id)}
-                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Approve
-              </button>
-              <button
-                onClick={() => onReject(product.id)}
-                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Reject
-              </button>
-            </div>
-          )}
-
           {/* Stock Management Actions */}
-          {product.status === 'approved' && (
-            <div className="flex space-x-2">
-              {canAdjustStock && (
-                <button
-                  onClick={() => setShowAdjustmentModal(true)}
-                  className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                >
-                  <Settings className="h-4 w-4 mr-1" />
-                  Adjust Stock
-                </button>
-              )}
+          <div className="flex space-x-2">
+            {canAdjustStock && (
               <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                title="View adjustment history"
+                onClick={() => setShowAdjustmentModal(true)}
+                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
               >
-                <History className="h-4 w-4" />
+                <Settings className="h-4 w-4 mr-1" />
+                Adjust Stock
               </button>
-            </div>
-          )}
+            )}
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              title="View adjustment history"
+            >
+              <History className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Stock Adjustment History */}
-        {showHistory && product.status === 'approved' && (
+        {showHistory && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <StockAdjustmentHistory productId={product.id} />
           </div>
