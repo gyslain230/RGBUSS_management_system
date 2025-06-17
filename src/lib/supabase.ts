@@ -166,36 +166,80 @@ export const signUpWithPhone = async (phone: string, password: string, fullName:
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
-  // First, create the auth user without additional data
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    phone,
-    password,
-  });
+  try {
+    // Create the auth user with metadata
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      phone,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: role,
+          phone_number: phone
+        }
+      }
+    });
 
-  if (authError) throw authError;
-
-  // If user was created successfully, create the profile
-  if (authData.user) {
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .insert([{
-        id: authData.user.id,
-        phone_number: phone,
-        full_name: fullName,
-        role: role,
-      }])
-      .select()
-      .single();
-
-    if (profileError) {
-      console.error('Error creating profile:', profileError);
-      throw new Error(`Failed to create user profile: ${profileError.message}`);
+    if (authError) {
+      console.error('Auth signup error:', authError);
+      throw authError;
     }
 
-    return { ...authData, profile: profileData };
-  }
+    if (!authData.user) {
+      throw new Error('User creation failed - no user returned');
+    }
 
-  return authData;
+    // Wait a moment for the trigger to process
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Check if profile was created by trigger, if not create manually
+    const { data: existingProfile, error: profileCheckError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    if (profileCheckError) {
+      console.error('Error checking profile:', profileCheckError);
+    }
+
+    if (!existingProfile) {
+      console.log('Profile not created by trigger, creating manually...');
+      
+      // Create profile manually if trigger didn't work
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: authData.user.id,
+          phone_number: phone,
+          full_name: fullName,
+          role: role,
+        }])
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('Error creating profile manually:', profileError);
+        
+        // Try to clean up the auth user if profile creation failed
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Error cleaning up auth user:', cleanupError);
+        }
+        
+        throw new Error(`Failed to create user profile: ${profileError.message}`);
+      }
+
+      return { ...authData, profile: profileData };
+    } else {
+      console.log('Profile created successfully by trigger');
+      return { ...authData, profile: existingProfile };
+    }
+  } catch (error) {
+    console.error('SignUp error:', error);
+    throw error;
+  }
 };
 
 export const signOut = async () => {
