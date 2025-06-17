@@ -27,9 +27,20 @@ if (!isSupabaseConfigured) {
 const createMockClient = () => ({
   auth: {
     getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
     signInWithPassword: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
     signUp: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
     signOut: () => Promise.resolve({ error: null }),
+    onAuthStateChange: (callback: (event: string, session: any) => void) => {
+      // Return a mock subscription object
+      return {
+        data: {
+          subscription: {
+            unsubscribe: () => {}
+          }
+        }
+      };
+    }
   },
   from: () => ({
     select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }) }) }),
