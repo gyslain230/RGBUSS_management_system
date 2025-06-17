@@ -62,30 +62,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('AuthProvider: Initializing...');
     
-    // Initialize default users in localStorage if they don't exist
-    const existingUsers = localStorage.getItem('users');
-    if (!existingUsers) {
-      console.log('AuthProvider: Creating default users');
-      localStorage.setItem('users', JSON.stringify(DEFAULT_USERS));
-    }
-
-    // Check for existing session
-    const currentUser = localStorage.getItem('currentUser');
-    console.log('AuthProvider: Checking for existing session:', currentUser);
-    
-    if (currentUser) {
-      try {
-        const parsedUser = JSON.parse(currentUser);
-        console.log('AuthProvider: Found existing user:', parsedUser);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('AuthProvider: Error parsing stored user:', error);
-        localStorage.removeItem('currentUser');
+    try {
+      // Initialize default users in localStorage if they don't exist
+      const existingUsers = localStorage.getItem('users');
+      if (!existingUsers) {
+        console.log('AuthProvider: Creating default users');
+        localStorage.setItem('users', JSON.stringify(DEFAULT_USERS));
       }
+
+      // Check for existing session
+      const currentUser = localStorage.getItem('currentUser');
+      console.log('AuthProvider: Checking for existing session:', currentUser);
+      
+      if (currentUser) {
+        try {
+          const parsedUser = JSON.parse(currentUser);
+          console.log('AuthProvider: Found existing user:', parsedUser);
+          setUser(parsedUser);
+        } catch (error) {
+          console.error('AuthProvider: Error parsing stored user:', error);
+          localStorage.removeItem('currentUser');
+        }
+      }
+    } catch (error) {
+      console.error('AuthProvider: Initialization error:', error);
+    } finally {
+      setLoading(false);
+      console.log('AuthProvider: Initialization complete');
     }
-    
-    setLoading(false);
-    console.log('AuthProvider: Initialization complete');
   }, []);
 
   const signIn = async (email: string, password: string) => {
