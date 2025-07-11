@@ -340,7 +340,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLastActivity(Date.now());
     setWarningShown(false);
     console.log('Session extended');
-    toast.success('Session extended successfully!');
   };
 
   const signIn = async (email: string, password: string) => {
