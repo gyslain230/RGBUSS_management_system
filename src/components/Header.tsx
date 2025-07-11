@@ -1,9 +1,19 @@
 import React from 'react';
-import { Menu, Bell, LogOut, Mail } from 'lucide-react';
+import { Menu, Bell, LogOut, Mail, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Header() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, sessionTimeRemaining, extendSession } = useAuth();
+
+  // Format time remaining for display
+  const formatTimeRemaining = (milliseconds: number) => {
+    const minutes = Math.floor(milliseconds / 60000);
+    const seconds = Math.floor((milliseconds % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Show session timer if less than 5 minutes remaining
+  const showSessionTimer = sessionTimeRemaining < 5 * 60 * 1000; // 5 minutes
 
   return (
     <div className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
@@ -22,6 +32,26 @@ export default function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Session Timer */}
+            {user && showSessionTimer && (
+              <div className="flex items-center space-x-2">
+                <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                  sessionTimeRemaining < 2 * 60 * 1000 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span>{formatTimeRemaining(sessionTimeRemaining)}</span>
+                </div>
+                <button
+                  onClick={extendSession}
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Extend
+                </button>
+              </div>
+            )}
+
             <button className="p-2 text-gray-400 hover:text-gray-500 relative transition-colors">
               <Bell className="h-6 w-6" />
               <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>

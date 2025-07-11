@@ -8,9 +8,16 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, extendSession } = useAuth();
 
   console.log('Layout: Rendering with user:', user?.email || 'None', 'loading:', loading);
+
+  // Extend session on any interaction within the layout
+  const handleUserActivity = () => {
+    if (user) {
+      extendSession();
+    }
+  };
 
   // This component should only render when user is authenticated
   // ProtectedRoute handles the authentication check
@@ -39,7 +46,12 @@ export default function Layout({ children }: LayoutProps) {
   console.log('Layout: Rendering layout for user:', user.email, 'role:', user.role);
 
   return (
-    <div className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50">
+    <div 
+      className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50"
+      onClick={handleUserActivity}
+      onKeyDown={handleUserActivity}
+      onMouseMove={handleUserActivity}
+    >
       {/* Sidebar - Fixed height, no scroll with page */}
       <div className="hidden md:block">
         <Sidebar />

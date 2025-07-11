@@ -2,6 +2,10 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, getCurrentUser, signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, isSupabaseReady } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
+// Session management constants
+const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+const WARNING_TIMEOUT = 13 * 60 * 1000; // Show warning at 13 minutes
+
 interface User {
   id: string;
   email: string;
@@ -17,6 +21,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
   signOut: () => Promise<void>;
+  extendSession: () => void;
+  sessionTimeRemaining: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +38,10 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionTimeRemaining, setSessionTimeRemaining] = useState(INACTIVITY_TIMEOUT);
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  const [warningShown, setWarningShown] = useState(false);
+  const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     console.log('AuthProvider: Initializing...');
@@ -202,6 +212,137 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Session management effects
+  useEffect(() => {
+    if (!user) {
+      // Clear timers when user is not logged in
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        setInactivityTimer(null);
+      }
+      setSessionTimeRemaining(INACTIVITY_TIMEOUT);
+      setWarningShown(false);
+      return;
+    }
+
+    // Set up activity tracking
+    const updateActivity = () => {
+      setLastActivity(Date.now());
+      setWarningShown(false);
+    };
+
+    // Activity event listeners
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    // Set up session timer
+    const startSessionTimer = () => {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+
+      const timer = setTimeout(async () => {
+        console.log('Session expired due to inactivity');
+        toast.error('Session expired due to inactivity. Please sign in again.');
+        await signOut();
+      }, INACTIVITY_TIMEOUT);
+
+      setInactivityTimer(timer);
+    };
+
+    // Set up warning timer
+    const startWarningTimer = () => {
+      setTimeout(() => {
+        if (user && !warningShown) {
+          setWarningShown(true);
+          toast((t) => (
+            <div className="flex flex-col space-y-2">
+              <span className="font-medium">Session expiring soon!</span>
+              <span className="text-sm">You'll be signed out in 2 minutes due to inactivity.</span>
+              <button
+                onClick={() => {
+                  extendSession();
+                  toast.dismiss(t.id);
+                }}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                Stay signed in
+              </button>
+            </div>
+          ), {
+            duration: 120000, // Show for 2 minutes
+            icon: '⏰',
+          });
+        }
+      }, WARNING_TIMEOUT);
+    };
+
+    startSessionTimer();
+    startWarningTimer();
+
+    // Update session time remaining every second
+    const updateTimer = setInterval(() => {
+      const timeElapsed = Date.now() - lastActivity;
+      const remaining = Math.max(0, INACTIVITY_TIMEOUT - timeElapsed);
+      setSessionTimeRemaining(remaining);
+
+      if (remaining === 0 && user) {
+        clearInterval(updateTimer);
+      }
+    }, 1000);
+
+    // Cleanup function
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity, true);
+      });
+      
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      
+      clearInterval(updateTimer);
+    };
+  }, [user, lastActivity, inactivityTimer, warningShown]);
+
+  // Handle window/tab close
+  useEffect(() => {
+    if (!user) return;
+
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      // Sign out when window is closed
+      await signOut();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && user) {
+        // Optional: You can choose to sign out immediately when tab becomes hidden
+        // or just when the window is actually closed (handled by beforeunload)
+        console.log('Tab hidden - session will expire if window is closed');
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
+
+  // Function to extend session
+  const extendSession = () => {
+    setLastActivity(Date.now());
+    setWarningShown(false);
+    console.log('Session extended');
+    toast.success('Session extended successfully!');
+  };
+
   const signIn = async (email: string, password: string) => {
     if (!isSupabaseReady()) {
       toast.error('Authentication service not configured. Please set up Supabase.');
@@ -218,6 +359,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('AuthProvider: Sign in successful, auth state change will handle profile loading');
+      
+      // Reset session timers on successful sign in
+      setLastActivity(Date.now());
+      setWarningShown(false);
       toast.success('Signing in...');
       
       // Don't set loading here - let the auth state change handler manage it
@@ -322,6 +467,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setLoading(false);
       console.log('AuthProvider: Successfully signed out');
+      
+      // Clear session state
+      setLastActivity(Date.now());
+      setWarningShown(false);
       toast.success('Signed out successfully!');
     } catch (error: any) {
       console.error('AuthProvider: Sign out failed:', error);
@@ -339,6 +488,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signUp,
     signOut,
+    extendSession,
+    sessionTimeRemaining,
   };
 
   console.log('AuthProvider: Current state - User:', user?.email || 'None', 'Loading:', loading, 'Supabase Ready:', isSupabaseReady());
