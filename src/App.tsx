@@ -97,10 +97,10 @@ function App() {
             } />
             
             {/* Default redirect - redirect to login instead of dashboard */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
             {/* Catch all route - redirect to login instead of dashboard */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </Router>

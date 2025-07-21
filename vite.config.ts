@@ -8,9 +8,33 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   server: {
-    historyApiFallback: true,
+    historyApiFallback: {
+      index: '/index.html',
+      rewrites: [
+        { from: /^\/dashboard/, to: '/index.html' },
+        { from: /^\/stock/, to: '/index.html' },
+        { from: /^\/sales/, to: '/index.html' },
+        { from: /^\/reports/, to: '/index.html' },
+        { from: /^\/users/, to: '/index.html' },
+        { from: /^\/credits/, to: '/index.html' },
+        { from: /^\/login/, to: '/index.html' },
+        { from: /^\/register/, to: '/index.html' },
+      ]
+    },
   },
   preview: {
-    historyApiFallback: true,
+    historyApiFallback: {
+      index: '/index.html',
+      rewrites: [
+        { from: /^\/dashboard/, to: '/index.html' },
+        { from: /^\/stock/, to: '/index.html' },
+        { from: /^\/sales/, to: '/index.html' },
+        { from: /^\/reports/, to: '/index.html' },
+        { from: /^\/users/, to: '/index.html' },
+        { from: /^\/credits/, to: '/index.html' },
+        { from: /^\/login/, to: '/index.html' },
+        { from: /^\/register/, to: '/index.html' },
+      ]
+    },
   },
 });
