@@ -317,21 +317,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut();
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && user) {
-        // Optional: You can choose to sign out immediately when tab becomes hidden
-        // or just when the window is actually closed (handled by beforeunload)
-        console.log('Tab hidden - session will expire if window is closed');
-      }
-    };
 
     // Add event listeners
     window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user]);
 
