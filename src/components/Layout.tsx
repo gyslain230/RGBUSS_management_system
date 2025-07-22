@@ -47,7 +47,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div 
-      className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50"
+      className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50 dark:bg-gray-900"
       onClick={handleUserActivity}
       onKeyDown={handleUserActivity}
       onMouseMove={handleUserActivity}
@@ -63,7 +63,7 @@ export default function Layout({ children }: LayoutProps) {
         <Header />
         
         {/* Main Content - Scrollable */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900">
           {children}
         </main>
       </div>

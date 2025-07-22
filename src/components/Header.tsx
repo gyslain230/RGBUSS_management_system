@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, Bell, LogOut, Mail, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import ThemeToggle from './ThemeToggle';
 
 export default function Header() {
   const { user, signOut, sessionTimeRemaining, extendSession } = useAuth();
@@ -16,17 +17,17 @@ export default function Header() {
   const showSessionTimer = sessionTimeRemaining < 5 * 60 * 1000; // 5 minutes
 
   return (
-    <div className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
+    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <button
               type="button"
-              className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
-            <h1 className="ml-4 text-xl font-semibold text-gray-900">
+            <h1 className="ml-4 text-xl font-semibold text-gray-900 dark:text-white">
               Business Management System
             </h1>
           </div>
@@ -37,44 +38,47 @@ export default function Header() {
               <div className="flex items-center space-x-2">
                 <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
                   sessionTimeRemaining < 2 * 60 * 1000 
-                    ? 'bg-red-100 text-red-800' 
-                    : 'bg-yellow-100 text-yellow-800'
+                    ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' 
+                    : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                 }`}>
                   <Clock className="h-4 w-4 mr-1" />
                   <span>{formatTimeRemaining(sessionTimeRemaining)}</span>
                 </div>
                 <button
                   onClick={extendSession}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                  className="px-3 py-1 bg-blue-600 dark:bg-blue-500 text-white rounded text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
                 >
                   Extend
                 </button>
               </div>
             )}
 
-            <button className="p-2 text-gray-400 hover:text-gray-500 relative transition-colors">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
+            <button className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 relative transition-colors">
               <Bell className="h-6 w-6" />
-              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white dark:ring-gray-800"></span>
             </button>
             
             <div className="flex items-center space-x-3">
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <span className="text-sm font-medium text-blue-800">
+                <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
                     {user?.full_name?.charAt(0).toUpperCase()}
                   </span>
                 </div>
               </div>
               <div className="hidden md:block">
-                <div className="text-sm font-medium text-gray-900">{user?.full_name}</div>
-                <div className="text-xs text-gray-500 flex items-center">
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{user?.full_name}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
                   <Mail className="h-3 w-3 mr-1" />
                   {user?.email} • {user?.role}
                 </div>
               </div>
               <button
                 onClick={signOut}
-                className="p-2 text-gray-400 hover:text-gray-500 transition-colors"
+                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors"
                 title="Sign out"
               >
                 <LogOut className="h-5 w-5" />

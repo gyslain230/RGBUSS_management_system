@@ -74,19 +74,19 @@ export default function LoginForm() {
   const isLoading = submitting || authLoading;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="flex justify-center">
             <div className="flex items-center">
               <Store className="h-12 w-12 text-blue-600" />
-              <span className="ml-2 text-3xl font-bold text-gray-900">RGBUSS</span>
+              <span className="ml-2 text-3xl font-bold text-gray-900 dark:text-white">RGBUSS</span>
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900 dark:text-white">
             Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             Business Management System
           </p>
         </div>
@@ -94,23 +94,23 @@ export default function LoginForm() {
         {/* Connection Status */}
         <div className={`p-4 rounded-lg border ${
           isSupabaseReady() 
-            ? 'bg-green-50 border-green-200' 
-            : 'bg-red-50 border-red-200'
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
         }`}>
           <div className="flex items-center">
             {isSupabaseReady() ? (
-              <Wifi className="h-5 w-5 text-green-600 mr-2" />
+              <Wifi className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
             ) : (
-              <WifiOff className="h-5 w-5 text-red-600 mr-2" />
+              <WifiOff className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
             )}
             <div>
               <p className={`text-sm font-medium ${
-                isSupabaseReady() ? 'text-green-800' : 'text-red-800'
+                isSupabaseReady() ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
               }`}>
                 {isSupabaseReady() ? 'Connected to Supabase' : 'Supabase Not Configured'}
               </p>
               <p className={`text-xs ${
-                isSupabaseReady() ? 'text-green-700' : 'text-red-700'
+                isSupabaseReady() ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
               }`}>
                 {isSupabaseReady() 
                   ? 'Authentication service is ready' 
@@ -124,7 +124,7 @@ export default function LoginForm() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Email Address
               </label>
               <div className="mt-1 relative">
@@ -140,13 +140,13 @@ export default function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading || !isSupabaseReady()}
-                  className="pl-10 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="pl-10 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
                   placeholder="Enter your email address"
                 />
               </div>
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Password
               </label>
               <div className="mt-1 relative">
@@ -159,7 +159,7 @@ export default function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading || !isSupabaseReady()}
-                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                 />
                 <button
@@ -169,9 +169,9 @@ export default function LoginForm() {
                   disabled={isLoading || !isSupabaseReady()}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
+                    <EyeOff className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
+                    <Eye className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   )}
                 </button>
               </div>
@@ -198,11 +198,11 @@ export default function LoginForm() {
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Need an account?{' '}
               <Link
                 to="/register"
-                className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
+                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors duration-200"
               >
                 Create one here
               </Link>
@@ -212,20 +212,20 @@ export default function LoginForm() {
 
         {/* Loading Status */}
         {isLoading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mt-0.5"></div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
                   {submitting ? 'Authenticating...' : 'Loading your profile...'}
                 </h3>
-                <p className="text-sm text-blue-700 mt-1">
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                   {submitting 
                     ? 'Verifying your credentials with the server...' 
                     : 'Setting up your dashboard and permissions...'
                   }
                 </p>
-                <p className="text-xs text-blue-600 mt-2">
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
                   This may take a few seconds. Please wait...
                 </p>
               </div>
@@ -235,14 +235,14 @@ export default function LoginForm() {
 
         {/* Authentication Tips */}
         {!isLoading && isSupabaseReady() && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex">
-              <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-blue-400 dark:text-blue-300 mt-0.5" />
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
                   Authentication Tips
                 </h3>
-                <div className="mt-2 text-sm text-blue-700">
+                <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                   <ul className="list-disc list-inside space-y-1">
                     <li>Make sure you have a stable internet connection</li>
                     <li>If login is slow, please wait - the system is processing your request</li>
@@ -257,14 +257,14 @@ export default function LoginForm() {
 
         {/* Supabase Configuration Warning */}
         {!isSupabaseReady() && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <div className="flex">
-              <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-red-400 dark:text-red-300 mt-0.5" />
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
                   Supabase Configuration Required
                 </h3>
-                <div className="mt-2 text-sm text-red-700">
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
                   <p>
                     The authentication service is not configured. Please set up your Supabase project:
                   </p>
@@ -281,8 +281,9 @@ export default function LoginForm() {
 
         {/* Development credentials info */}
         {isSupabaseReady() && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <div className="text-sm text-green-700">
+            <div className="text-sm text-green-700 dark:text-green-300">
               <p className="font-medium mb-1">🔧 For Testing</p>
               <p className="text-xs">
                 Create an account using the Register page, then sign in here.
@@ -290,7 +291,7 @@ export default function LoginForm() {
               <div className="mt-2">
                 <Link
                   to="/register"
-                  className="text-green-600 hover:text-green-800 text-sm font-medium"
+                  className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 text-sm font-medium"
                 >
                   Go to Registration →
                 </Link>

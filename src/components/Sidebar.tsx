@@ -59,11 +59,11 @@ export default function Sidebar() {
   );
 
   return (
-    <div className="h-full bg-white shadow-lg border-r border-gray-200 flex flex-col">
+    <div className="h-full bg-white dark:bg-gray-800 shadow-lg border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo Section */}
-      <div className="flex items-center flex-shrink-0 px-6 py-6 border-b border-gray-200">
+      <div className="flex items-center flex-shrink-0 px-6 py-6 border-b border-gray-200 dark:border-gray-700">
         <Store className="h-8 w-8 text-blue-600" />
-        <span className="ml-3 text-xl font-bold text-gray-900">RGBUSS</span>
+        <span className="ml-3 text-xl font-bold text-gray-900 dark:text-white">RGBUSS</span>
       </div>
       
       {/* Navigation - Scrollable if needed */}
@@ -75,8 +75,8 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
               }`
             }
           >
@@ -84,7 +84,7 @@ export default function Sidebar() {
               <>
                 <item.icon
                   className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors duration-200 ${
-                    isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
+                    isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-300'
                   }`}
                   aria-hidden="true"
                 />
@@ -96,24 +96,24 @@ export default function Sidebar() {
       </nav>
 
       {/* User Info Section - Fixed at bottom */}
-      <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200 bg-gray-50">
+      <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <span className="text-sm font-medium text-blue-800">
+            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
                 {user?.full_name?.charAt(0).toUpperCase()}
               </span>
             </div>
           </div>
           <div className="ml-3 min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
               {user?.full_name}
             </p>
-            <div className="flex items-center text-xs text-gray-500">
+            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
               <Mail className="h-3 w-3 mr-1" />
               <span className="truncate">{user?.email}</span>
             </div>
-            <p className="text-xs text-gray-500 capitalize">
+            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
               {user?.role}
             </p>
           </div>
