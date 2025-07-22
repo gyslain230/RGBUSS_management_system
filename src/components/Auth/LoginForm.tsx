@@ -282,7 +282,6 @@ export default function LoginForm() {
         {/* Development credentials info */}
         {isSupabaseReady() && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-            <div className="text-sm text-green-700">
             <div className="text-sm text-green-700 dark:text-green-300">
               <p className="font-medium mb-1">🔧 For Testing</p>
               <p className="text-xs">
