@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Package, ShoppingCart, CreditCard, TrendingUp, Users, Calendar, AlertTriangle, Download, FileText } from 'lucide-react';
+import { DollarSign, Package, ShoppingCart, CreditCard, TrendingUp, Calendar, AlertTriangle, Download, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Product, Sale, Credit, StockAdjustment } from '../lib/supabase';
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
@@ -12,7 +12,6 @@ import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-// Extend jsPDF type to include autoTable
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: (options: any) => jsPDF;
@@ -97,13 +96,11 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
 
-      // Fetch all data with error handling
       const fetchWithFallback = async (query: any, fallback: any[] = []) => {
         try {
           const result = await query;
           return result.data || fallback;
         } catch (err) {
-          console.warn('Query failed, using fallback:', err);
           return fallback;
         }
       };
@@ -115,12 +112,10 @@ export default function Dashboard() {
         fetchWithFallback(supabase.from('stock_adjustments').select('*').order('created_at', { ascending: false }))
       ]);
 
-      // Calculate metrics safely
       const today = new Date();
       const todayStart = startOfDay(today);
       const todayEnd = endOfDay(today);
 
-      // Today's data
       const todaySales = sales.filter(sale => {
         try {
           return new Date(sale.created_at) >= todayStart && new Date(sale.created_at) <= todayEnd;
@@ -137,7 +132,6 @@ export default function Dashboard() {
         }
       });
 
-      // Calculate today's sorties from stock adjustments
       const todayAdjustments = adjustments.filter(adj => {
         try {
           return new Date(adj.created_at) >= todayStart && new Date(adj.created_at) <= todayEnd;
@@ -146,10 +140,8 @@ export default function Dashboard() {
         }
       });
 
-      // Calculate sorties based on daily report logic
       const todaySortiesTotal = calculateTodaySorties(products, todayAdjustments);
 
-      // Recent sorties for display (last 10 adjustments that represent sorties)
       const recentSortiesData = todayAdjustments
         .filter(adj => adj.adjustment_type === 'decrease')
         .slice(0, 10)
@@ -161,7 +153,6 @@ export default function Dashboard() {
           adjustment_type: adj.adjustment_type
         }));
 
-      // Calculate metrics safely
       const calculatedMetrics: DashboardMetrics = {
         totalRevenue: sales.reduce((sum, sale) => sum + (Number(sale.total_amount) || 0), 0),
         totalProducts: products.length,
@@ -175,17 +166,13 @@ export default function Dashboard() {
         todaySorties: todaySortiesTotal
       };
 
-      // Generate chart data safely
       const salesChartData = generateSalesChartData(sales);
       const categoryChartData = generateCategoryData(products);
 
-      // Recent sales (last 10)
       const recentSalesData = sales.slice(0, 10);
 
-      // Stock alerts (low stock products)
       const stockAlertsData = products.filter(p => (Number(p.quantity) || 0) < 5);
 
-      // Update state
       setMetrics(calculatedMetrics);
       setSalesData(salesChartData);
       setCategoryData(categoryChartData);
@@ -194,7 +181,6 @@ export default function Dashboard() {
       setStockAlerts(stockAlertsData);
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');
       toast.error('Error loading dashboard data');
     } finally {
@@ -208,19 +194,14 @@ export default function Dashboard() {
 
       products.forEach(product => {
         try {
-          // Get today's adjustments for this product
           const productAdjustments = todayAdjustments.filter(adj => adj.product_id === product.id);
-          
-          // Calculate entres (increases only)
           const entres = productAdjustments
             .filter(adj => adj.adjustment_type === 'increase')
             .reduce((sum, adj) => sum + (Number(adj.quantity_adjusted) || 0), 0);
 
-          // Get previous day stock (simplified - using 0 for now)
-          const stock = 0; // Previous day's solde
-          const totalJour = stock + entres; // Total available for the day
-          const solde = Number(product.quantity) || 0; // Current balance
-          const sortie = Math.max(0, totalJour - solde); // Sortie calculation
+          const stock = 0;
+          const solde = Number(product.quantity) || 0;
+          const sortie = Math.max(0, totalJour - solde);
 
           totalSorties += sortie;
         } catch (err) {
@@ -248,7 +229,6 @@ export default function Dashboard() {
             return saleDate >= dayStart && saleDate <= dayEnd;
           } catch {
             return false;
-          }
         });
 
         return {
@@ -263,7 +243,6 @@ export default function Dashboard() {
       console.warn('Error generating sales chart data:', error);
       return [];
     }
-  };
 
   const generateCategoryData = (products: Product[]): CategoryData[] => {
     try {
@@ -272,7 +251,6 @@ export default function Dashboard() {
       products.forEach(product => {
         try {
           const category = product.category || 'Unknown';
-          const quantity = Number(product.quantity) || 0;
           categoryMap.set(category, (categoryMap.get(category) || 0) + quantity);
         } catch (err) {
           console.warn('Error processing product for category data:', product.name, err);
@@ -281,7 +259,6 @@ export default function Dashboard() {
 
       return Array.from(categoryMap.entries()).map(([name, value]) => ({
         name,
-        value
       }));
     } catch (error) {
       console.warn('Error generating category data:', error);
@@ -293,7 +270,6 @@ export default function Dashboard() {
     try {
       const previousDate = format(subDays(new Date(currentDate), 1), 'yyyy-MM-dd');
       
-      // Check if there are any stock adjustments before the current date
       const { data: historicalAdjustments, error } = await supabase
         .from('stock_adjustments')
         .select('*')
@@ -304,16 +280,13 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      // If no historical adjustments exist, this is the first day - stock should be 0
       if (!historicalAdjustments || historicalAdjustments.length === 0) {
         return 0;
       }
 
-      // Get the last known stock level from the most recent adjustment before current date
       const lastAdjustment = historicalAdjustments[0];
       return lastAdjustment.new_quantity;
     } catch (error) {
-      console.error('Error getting previous day stock:', error);
       return 0;
     }
   };
@@ -335,7 +308,7 @@ export default function Dashboard() {
           reportTitle = `Daily Report - ${format(today, 'MMMM dd, yyyy')}`;
           break;
         case 'weekly':
-          startDate = startOfWeek(today, { weekStartsOn: 1 }); // Monday start
+          startDate = startOfWeek(today, { weekStartsOn: 1 });
           endDate = endOfWeek(today, { weekStartsOn: 1 });
           reportTitle = `Weekly Report - ${format(startDate, 'MMM dd')} to ${format(endDate, 'MMM dd, yyyy')}`;
           break;
@@ -346,7 +319,6 @@ export default function Dashboard() {
           break;
       }
 
-      // Fetch data for the period
       const [products, adjustments, credits] = await Promise.all([
         supabase.from('products').select('*').order('name'),
         supabase.from('stock_adjustments').select('*')
@@ -363,32 +335,26 @@ export default function Dashboard() {
         throw new Error('Failed to fetch report data');
       }
 
-      // Process data for each product
       const reportData: DailyReportData[] = await Promise.all(
         products.data.map(async (product, index) => {
-          // Get stock from previous day (0 if first day)
           const previousDayStock = reportType === 'today' ? 
             await getPreviousDayStock(product.id, format(startDate, 'yyyy-MM-dd')) : 0;
           
-          // Calculate stock adjustments (entres) for this product in the period
           const productAdjustments = adjustments.data.filter(adj => adj.product_id === product.id);
           
-          // Calculate entres (increases only)
           const entres = productAdjustments
             .filter(adj => adj.adjustment_type === 'increase')
             .reduce((sum, adj) => sum + adj.quantity_adjusted, 0);
 
-          // Calculate values based on business logic
-          const stock = previousDayStock; // Stock = previous day's solde
-          const totalJour = stock + entres; // Total available for the day
-          const solde = Number(product.quantity) || 0; // Current balance (end of day)
+          const stock = previousDayStock;
+          const totalJour = stock + entres;
+          const solde = Number(product.quantity) || 0;
           
-          // Sortie = Total/Jour - Solde
           const sortie = totalJour - solde;
           
-          const pUnit1 = Number(product.price) || 0; // Unit price
-          const pTotal = sortie * pUnit1; // P.Total = Sortie × P.Unit 1
-          const amavide = Math.max(0, solde - 5); // Available minus minimum stock (5)
+          const pUnit1 = Number(product.price) || 0;
+          const pTotal = sortie * pUnit1;
+          const amavide = Math.max(0, solde - 5);
 
           return {
             no: index + 1,
@@ -406,12 +372,10 @@ export default function Dashboard() {
         })
       );
 
-      // Generate PDF
       const doc = new jsPDF('portrait', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       
-      // Header - Company Name and Title
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('BAR LE BON SAMARITAIN', 20, 20);
@@ -420,21 +384,17 @@ export default function Dashboard() {
       doc.setFont('helvetica', 'normal');
       doc.text(reportTitle, 20, 28);
       
-      // Date range
       doc.setFontSize(10);
       doc.text(`Period: ${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`, 20, 36);
 
-      // Column headers for the main table
       const startY = 45;
       const rowHeight = 6;
       const colWidths = [12, 45, 15, 15, 20, 15, 15, 18, 18, 15];
       let currentX = 20;
 
-      // Draw table headers
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       
-      // Header row
       doc.rect(20, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
       
       const headers = ['No', 'LIBELLE', 'Stock', 'Entres', 'Total/Jour', 'Solde', 'Sortie', 'P.Unit 1', 'P.Total', 'Amavide'];
@@ -450,7 +410,6 @@ export default function Dashboard() {
       
       doc.line(currentX, startY, currentX, startY + rowHeight);
 
-      // Data rows
       doc.setFont('helvetica', 'normal');
       let currentY = startY + rowHeight;
       
@@ -489,7 +448,6 @@ export default function Dashboard() {
         currentY += rowHeight;
       });
 
-      // Total row
       const totals = {
         totalStock: reportData.reduce((sum, item) => sum + Number(item.stock || 0), 0),
         totalEntres: reportData.reduce((sum, item) => sum + Number(item.entres || 0), 0),
@@ -536,7 +494,6 @@ export default function Dashboard() {
       doc.line(currentX, currentY, currentX, currentY + rowHeight);
       currentY += rowHeight + 10;
 
-      // Credits section
       if (credits.data.length > 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -587,7 +544,6 @@ export default function Dashboard() {
           currentY += rowHeight;
         });
 
-        // Credit total
         doc.setFont('helvetica', 'bold');
         const totalCreditAmount = credits.data.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
         doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
@@ -612,7 +568,6 @@ export default function Dashboard() {
         doc.line(currentX, currentY, currentX, currentY + rowHeight);
       }
 
-      // Footer
       const footerY = pageHeight - 30;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
@@ -620,20 +575,17 @@ export default function Dashboard() {
       doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 20, footerY + 5);
       doc.text('RGBUSS Business Management System', pageWidth - 20, footerY, { align: 'right' });
 
-      // Save the PDF
       const fileName = `${reportType}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
       doc.save(fileName);
 
       toast.success(`${reportType.charAt(0).toUpperCase() + reportType.slice(1)} report downloaded successfully!`);
     } catch (error) {
-      console.error('Error generating report:', error);
       toast.error(`Error generating ${reportType} report`);
     } finally {
       setDownloadingReport(null);
     }
   };
 
-  // Show loading state while auth is loading
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -645,7 +597,6 @@ export default function Dashboard() {
     );
   }
 
-  // Show error state
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -664,7 +615,6 @@ export default function Dashboard() {
     );
   }
 
-  // Show loading state while fetching data
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -678,7 +628,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -692,7 +641,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Daily Report Download Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -703,7 +651,6 @@ export default function Dashboard() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Today's Report */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -722,7 +669,6 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Weekly Report */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -743,7 +689,6 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Monthly Report */}
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -763,7 +708,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Report Information */}
         <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
           <div className="text-sm text-gray-700">
             <p className="font-medium mb-1">📋 Report Information</p>
@@ -777,7 +721,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Revenue"
@@ -809,9 +752,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Sales Overview</h3>
@@ -828,7 +769,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Category Distribution */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Stock by Category</h3>
@@ -865,12 +805,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent Activity Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Sales */}
         <RecentSalesTable sales={recentSales} />
 
-        {/* Recent Sorties */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Today's Sorties</h3>
@@ -913,12 +850,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Stock Alerts */}
         <StockAlerts alerts={stockAlerts} />
 
-        {/* AI Insights */}
         <AIInsights />
       </div>
     </div>

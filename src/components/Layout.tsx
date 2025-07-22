@@ -10,17 +10,12 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { user, loading, extendSession } = useAuth();
 
-  console.log('Layout: Rendering with user:', user?.email || 'None', 'loading:', loading);
-
-  // Extend session on any interaction within the layout
   const handleUserActivity = () => {
     if (user) {
       extendSession();
     }
   };
 
-  // This component should only render when user is authenticated
-  // ProtectedRoute handles the authentication check
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -33,7 +28,6 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   if (!user) {
-    console.log('Layout: No user found, this should not happen in a protected route');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -43,7 +37,6 @@ export default function Layout({ children }: LayoutProps) {
     );
   }
 
-  console.log('Layout: Rendering layout for user:', user.email, 'role:', user.role);
 
   return (
     <div 
@@ -52,17 +45,13 @@ export default function Layout({ children }: LayoutProps) {
       onKeyDown={handleUserActivity}
       onMouseMove={handleUserActivity}
     >
-      {/* Sidebar - Fixed height, no scroll with page */}
       <div className="hidden md:block">
         <Sidebar />
       </div>
       
-      {/* Main Content Area */}
       <div className="flex flex-col min-h-0">
-        {/* Header - Sticky at top of content area */}
         <Header />
         
-        {/* Main Content - Scrollable */}
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900">
           {children}
         </main>

@@ -25,7 +25,6 @@ export default function SalesManagement() {
 
   const fetchProducts = async () => {
     try {
-      console.log('🔍 Fetching products from localStorage...');
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -33,10 +32,8 @@ export default function SalesManagement() {
         .order('name');
 
       if (error) throw error;
-      console.log('📦 Found products:', data?.length || 0);
       setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
       toast.error('Error loading products');
     } finally {
       setLoading(false);
@@ -67,17 +64,14 @@ export default function SalesManagement() {
       return;
     }
 
-    // Check if product already exists in entries
     const existingEntryIndex = soldeEntries.findIndex(entry => entry.product.id === selectedProductId);
     
     if (existingEntryIndex >= 0) {
-      // Update existing entry
       const updatedEntries = [...soldeEntries];
       updatedEntries[existingEntryIndex].soldeQuantity = soldeQty;
       setSoldeEntries(updatedEntries);
       toast.success('Solde entry updated');
     } else {
-      // Add new entry
       const newEntry: SoldeEntry = {
         id: Date.now().toString(),
         product: selectedProduct,
@@ -87,7 +81,6 @@ export default function SalesManagement() {
       toast.success('Solde entry added');
     }
 
-    // Reset form but keep products list intact
     setSelectedProductId('');
     setSoldeQuantity('');
   };
@@ -123,26 +116,18 @@ export default function SalesManagement() {
 
     setSubmitting(true);
     try {
-      console.log('🚀 Starting solde submission process...');
-      console.log('📊 Processing', soldeEntries.length, 'solde entries');
 
-      // Process each solde entry
       for (const entry of soldeEntries) {
         const currentQuantity = entry.product.quantity;
         const newSoldeQuantity = entry.soldeQuantity;
         
-        console.log(`📦 Processing ${entry.product.name}: ${currentQuantity} → ${newSoldeQuantity}`);
-        
-        // Calculate the difference to determine adjustment type and quantity
         const difference = newSoldeQuantity - currentQuantity;
         
         if (difference !== 0) {
           const adjustmentType = difference > 0 ? 'increase' : 'decrease';
           const adjustmentQuantity = Math.abs(difference);
 
-          console.log(`📈 Creating ${adjustmentType} adjustment of ${adjustmentQuantity} for ${entry.product.name}`);
 
-          // Update product quantity to match the solde
           const { error: updateError } = await supabase
             .from('products')
             .update({ 
@@ -152,9 +137,7 @@ export default function SalesManagement() {
             .eq('id', entry.product.id);
 
           if (updateError) throw updateError;
-          console.log(`✅ Updated product quantity for ${entry.product.name}`);
 
-          // Record the stock adjustment for daily reports
           const adjustmentData = {
             product_id: entry.product.id,
             product_name: entry.product.name,
@@ -168,28 +151,21 @@ export default function SalesManagement() {
             created_at: new Date().toISOString()
           };
 
-          console.log('📝 Creating stock adjustment record:', adjustmentData);
 
           const { error: adjustmentError } = await supabase
             .from('stock_adjustments')
             .insert([adjustmentData]);
 
           if (adjustmentError) throw adjustmentError;
-          console.log(`✅ Created stock adjustment record for ${entry.product.name}`);
-        } else {
-          console.log(`⚪ No change needed for ${entry.product.name} (same quantity)`);
         }
       }
 
-      console.log('🎉 All solde entries processed successfully!');
       toast.success(`Successfully updated solde for ${soldeEntries.length} products`);
       
-      // Clear entries and refresh products
       setSoldeEntries([]);
       await fetchProducts();
       
     } catch (error) {
-      console.error('❌ Error submitting solde entries:', error);
       toast.error('Error updating solde entries');
     } finally {
       setSubmitting(false);
@@ -199,7 +175,6 @@ export default function SalesManagement() {
   const getTotalEntries = () => soldeEntries.length;
   const getTotalSoldeValue = () => soldeEntries.reduce((sum, entry) => sum + (entry.soldeQuantity * entry.product.price), 0);
 
-  // Get available products (exclude those already in entries)
   const availableProducts = products.filter(product => 
     !soldeEntries.some(entry => entry.product.id === product.id)
   );
@@ -214,7 +189,6 @@ export default function SalesManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales Management</h1>
@@ -225,7 +199,6 @@ export default function SalesManagement() {
         </div>
       </div>
 
-      {/* Product Selection Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center mb-4">
           <Package className="h-5 w-5 text-blue-600 mr-2" />
@@ -233,7 +206,6 @@ export default function SalesManagement() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Product Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Select Product
@@ -257,7 +229,6 @@ export default function SalesManagement() {
             )}
           </div>
 
-          {/* Solde Quantity Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               New Solde Quantity
@@ -275,7 +246,6 @@ export default function SalesManagement() {
             </p>
           </div>
 
-          {/* Add Button */}
           <div className="flex items-end">
             <button
               onClick={handleAddSoldeEntry}
@@ -288,7 +258,6 @@ export default function SalesManagement() {
           </div>
         </div>
 
-        {/* Current Product Info */}
         {selectedProductId && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
             {(() => {
@@ -327,7 +296,6 @@ export default function SalesManagement() {
         )}
       </div>
 
-      {/* Solde Entries List */}
       {soldeEntries.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -433,7 +401,6 @@ export default function SalesManagement() {
             </table>
           </div>
 
-          {/* Submit Section */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
@@ -455,7 +422,6 @@ export default function SalesManagement() {
         </div>
       )}
 
-      {/* Empty State */}
       {soldeEntries.length === 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
           <div className="text-center">
@@ -471,7 +437,6 @@ export default function SalesManagement() {
         </div>
       )}
 
-      {/* Information Panel */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex">
           <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
