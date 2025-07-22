@@ -5,7 +5,6 @@ import { supabase, Product, Sale, StockAdjustment, Credit, DailyReportStorage, g
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
@@ -48,7 +47,6 @@ export default function DailyReports() {
 
   const getPreviousDayStock = async (productId: string, currentDate: string) => {
     try {
-      const previousDate = format(subDays(new Date(currentDate), 1), 'yyyy-MM-dd');
       
       // First check stored reports for previous day
       const { data: storedReport } = await supabase
@@ -60,7 +58,6 @@ export default function DailyReports() {
 
       if (storedReport) {
         return storedReport.solde;
-      }
 
       // Fallback to stock adjustments
       const { data: historicalAdjustments, error } = await supabase
@@ -71,16 +68,13 @@ export default function DailyReports() {
         .order('created_at', { ascending: false })
         .limit(1);
 
-      if (error) throw error;
 
       if (!historicalAdjustments || historicalAdjustments.length === 0) {
         return 0;
       }
-
       const lastAdjustment = historicalAdjustments[0];
       return lastAdjustment.new_quantity;
     } catch (error) {
-      console.error('Error getting previous day stock:', error);
       return 0;
     }
   };
@@ -88,18 +82,13 @@ export default function DailyReports() {
   const fetchReportData = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Fetching report data for date:', selectedDate);
-      
-      // First check if we have stored data for this date
       const storedData = await getDailyReportForDate(selectedDate);
       
       if (storedData && storedData.length > 0) {
-        console.log('📊 Found stored report data:', storedData.length, 'items');
         setStoredReports(storedData);
         setUseStoredData(true);
         setHasReportData(true);
         
-        // Convert stored data to display format
         const convertedData: DailyReportData[] = storedData.map(item => ({
           no: item.no,
           libelle: item.libelle,
@@ -117,16 +106,13 @@ export default function DailyReports() {
         setReportData(convertedData);
         setAdjustmentsFound(storedData.reduce((sum, item) => sum + item.entres, 0));
       } else {
-        console.log('📊 No stored data found, generating live report');
         setUseStoredData(false);
         await generateLiveReport();
       }
 
-      // Always fetch credits for the selected date
       await fetchCreditsForDate();
       
     } catch (error) {
-      console.error('❌ Error fetching report data:', error);
       toast.error('Error loading report data');
       setHasReportData(false);
     } finally {
@@ -136,7 +122,6 @@ export default function DailyReports() {
 
   const generateLiveReport = async () => {
     try {
-      // Fetch all approved products
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('*')
@@ -144,9 +129,7 @@ export default function DailyReports() {
         .order('name');
 
       if (productsError) throw productsError;
-      console.log('📦 Found products:', products?.length || 0);
 
-      // Fetch stock adjustments for the selected date
       const startOfDay = `${selectedDate}T00:00:00.000Z`;
       const endOfDay = `${selectedDate}T23:59:59.999Z`;
 
@@ -159,10 +142,8 @@ export default function DailyReports() {
 
       if (adjustmentsError) throw adjustmentsError;
       
-      console.log('📊 Found adjustments for selected date:', adjustments?.length || 0);
       setAdjustmentsFound(adjustments?.length || 0);
 
-      // Check if this is the first day
       const { data: allAdjustments, error: allAdjustmentsError } = await supabase
         .from('stock_adjustments')
         .select('created_at')
@@ -183,7 +164,6 @@ export default function DailyReports() {
       
       setHasReportData(hasData);
 
-      // Process data for each product
       const processedData: DailyReportData[] = await Promise.all(
         (products || []).map(async (product, index) => {
           const previousDayStock = isFirstDayEver ? 0 : await getPreviousDayStock(product.id, selectedDate);
@@ -220,7 +200,6 @@ export default function DailyReports() {
 
       setReportData(processedData);
     } catch (error) {
-      console.error('Error generating live report:', error);
       throw error;
     }
   };
@@ -240,7 +219,6 @@ export default function DailyReports() {
       if (creditsError) throw creditsError;
       setCreditsData(credits || []);
     } catch (error) {
-      console.error('Error fetching credits:', error);
       setCreditsData([]);
     }
   };
@@ -256,14 +234,11 @@ export default function DailyReports() {
     setGenerating(true);
     try {
       const result = await generateDailyReport(selectedDate);
-      console.log('Generated daily report:', result);
       
       toast.success(`Daily report generated and stored! ${result.products_processed} products processed.`);
       
-      // Refresh the data to show the newly stored report
       await fetchReportData();
     } catch (error) {
-      console.error('Error generating daily report:', error);
       toast.error('Error generating daily report');
     } finally {
       setGenerating(false);
@@ -281,7 +256,6 @@ export default function DailyReports() {
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       
-      // Header
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('BAR LE BON SAMARITAIN', 20, 20);
@@ -290,18 +264,15 @@ export default function DailyReports() {
       doc.setFont('helvetica', 'normal');
       doc.text('FICHE D\'EXPLOITATION/CAISSE', 20, 28);
       
-      // Date and source
       doc.setFontSize(10);
       doc.text(`DATE: ${format(new Date(selectedDate), 'dd/MM/yyyy')}`, 20, 36);
       doc.text(`Source: ${useStoredData ? 'Stored Database Report' : 'Live Generated Report'}`, 20, 42);
 
-      // Main table
       const startY = 50;
       const rowHeight = 6;
       const colWidths = [12, 45, 15, 15, 20, 15, 15, 18, 18, 15];
       let currentX = 20;
 
-      // Table headers
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.rect(20, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
@@ -318,7 +289,6 @@ export default function DailyReports() {
       });
       doc.line(currentX, startY, currentX, startY + rowHeight);
 
-      // Data rows
       doc.setFont('helvetica', 'normal');
       let currentY = startY + rowHeight;
       
@@ -357,7 +327,6 @@ export default function DailyReports() {
         currentY += rowHeight;
       });
 
-      // Total row
       const totals = calculateTotals();
       doc.setFont('helvetica', 'bold');
       doc.rect(20, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
@@ -395,7 +364,6 @@ export default function DailyReports() {
       doc.line(currentX, currentY, currentX, currentY + rowHeight);
       currentY += rowHeight + 10;
 
-      // Credits section
       if (creditsData.length > 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -446,7 +414,6 @@ export default function DailyReports() {
           currentY += rowHeight;
         });
 
-        // Credit total
         doc.setFont('helvetica', 'bold');
         const totalCreditAmount = creditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
         doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
@@ -471,7 +438,6 @@ export default function DailyReports() {
         doc.line(currentX, currentY, currentX, currentY + rowHeight);
       }
 
-      // Footer
       const footerY = pageHeight - 30;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
@@ -485,7 +451,6 @@ export default function DailyReports() {
 
       toast.success('Daily report exported as PDF successfully!');
     } catch (error) {
-      console.error('Error exporting PDF:', error);
       toast.error('Error exporting PDF report');
     }
   };
@@ -514,7 +479,6 @@ export default function DailyReports() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Daily Reports</h1>
@@ -531,7 +495,6 @@ export default function DailyReports() {
         </div>
         
         <div className="flex items-center space-x-4">
-          {/* Date Selector */}
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-gray-400" />
             <input
@@ -542,7 +505,6 @@ export default function DailyReports() {
             />
           </div>
 
-          {/* Generate & Store Button */}
           {!useStoredData && (
             <button
               onClick={handleGenerateAndStore}
@@ -554,7 +516,6 @@ export default function DailyReports() {
             </button>
           )}
 
-          {/* Refresh Button */}
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -564,7 +525,6 @@ export default function DailyReports() {
             Refresh
           </button>
 
-          {/* Export Button */}
           <button
             onClick={handleExportReport}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -575,7 +535,6 @@ export default function DailyReports() {
         </div>
       </div>
 
-      {/* Data Source Information */}
       <div className={`p-4 rounded-lg border ${
         useStoredData 
           ? 'bg-green-50 border-green-200' 
@@ -617,7 +576,6 @@ export default function DailyReports() {
         </div>
       </div>
 
-      {/* No Data Warning */}
       {!hasReportData && !loading && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex">
@@ -645,7 +603,6 @@ export default function DailyReports() {
         </div>
       )}
 
-      {/* Report Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Products</p>
@@ -673,9 +630,7 @@ export default function DailyReports() {
         </div>
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Daily Report Table */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -791,7 +746,6 @@ export default function DailyReports() {
                     ))}
                   </tbody>
                   
-                  {/* Summary Row */}
                   <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                     <tr className="font-semibold">
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
@@ -834,7 +788,6 @@ export default function DailyReports() {
           </div>
         </div>
 
-        {/* Credit Table */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-orange-50">
@@ -889,7 +842,6 @@ export default function DailyReports() {
                     ))}
                   </tbody>
                   
-                  {/* Credit Summary Row */}
                   <tfoot className="bg-orange-100 border-t-2 border-orange-300">
                     <tr className="font-semibold">
                       <td className="px-4 py-3 text-sm text-gray-900">
