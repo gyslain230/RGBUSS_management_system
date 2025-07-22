@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Store, Mail, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSupabaseReady } from '../../lib/supabase';
+import ThemeToggle from '../ThemeToggle';
 import toast from 'react-hot-toast';
 
 export default function LoginForm() {
@@ -76,6 +77,11 @@ export default function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        {/* Theme Toggle - Top Right */}
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
+        
         <div>
           <div className="flex justify-center">
             <div className="flex items-center">

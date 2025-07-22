@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Store, UserPlus, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import ThemeToggle from '../ThemeToggle';
 import toast from 'react-hot-toast';
 
 export default function RegisterForm() {
@@ -55,6 +56,11 @@ export default function RegisterForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        {/* Theme Toggle - Top Right */}
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
+        
         <div>
           <div className="flex justify-center">
             <div className="flex items-center">
