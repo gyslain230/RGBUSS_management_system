@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, AlertCircle } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -33,21 +33,12 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     setError(null);
     
     try {
-      console.log('AddUserModal: Creating user with data:', {
-        email: data.email,
-        fullName: data.fullName,
-        role: data.role
-      });
-      
       await signUp(data.email, data.password, data.fullName, data.role);
-      
-      console.log('AddUserModal: User created successfully');
       toast.success('User created successfully!');
       reset();
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('AddUserModal: Error creating user:', error);
       const errorMessage = error.message || 'Failed to create user';
       setError(errorMessage);
       toast.error(errorMessage);
@@ -113,24 +104,19 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email Address
             </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-4 w-4 text-gray-400" />
-              </div>
-              <input
-                type="email"
-                {...register('email', { 
-                  required: 'Email is required',
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address'
-                  }
-                })}
-                disabled={loading}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-                placeholder="Enter email address"
-              />
-            </div>
+            <input
+              type="email"
+              {...register('email', { 
+                required: 'Email is required',
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: 'Invalid email address'
+                }
+              })}
+              disabled={loading}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+              placeholder="Enter email address"
+            />
             {errors.email && (
               <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
             )}

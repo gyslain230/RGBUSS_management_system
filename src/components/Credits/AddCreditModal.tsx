@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CreditCard, User, Calendar, DollarSign, Package } from 'lucide-react';
+import { X, CreditCard, User, DollarSign, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { supabase, Product } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -57,7 +57,6 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
       toast.error('Error loading products');
     }
   };
@@ -76,7 +75,7 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
           due_date: data.due_date,
           issued_by: user.id,
           status: 'pending',
-          sale_id: null // This is a manual credit entry, not from a sale
+          sale_id: null
         }]);
 
       if (error) throw error;
@@ -86,7 +85,6 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
       setSelectedProduct(null);
       onSuccess();
     } catch (error) {
-      console.error('Error adding credit:', error);
       toast.error('Error adding credit');
     } finally {
       setLoading(false);
@@ -178,10 +176,8 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
             )}
           </div>
 
-          {/* Due Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Calendar className="h-4 w-4 inline mr-1" />
               Due Date
             </label>
             <input
@@ -195,7 +191,6 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
             )}
           </div>
 
-          {/* Notes (Optional) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Notes (Optional)
@@ -208,7 +203,6 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
             />
           </div>
 
-          {/* Credit Summary */}
           {selectedProduct && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="font-medium text-blue-900 mb-2">Credit Summary</h3>
@@ -233,7 +227,6 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
             </div>
           )}
 
-          {/* Information Box */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <div className="text-sm text-green-800">
               <p className="font-medium mb-1">📊 Dashboard Integration</p>

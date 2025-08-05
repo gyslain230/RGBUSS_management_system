@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Search, Filter, AlertTriangle, CheckCircle, Plus, DollarSign, Calendar, User } from 'lucide-react';
+import { CreditCard, Search, AlertTriangle, CheckCircle, Plus, DollarSign } from 'lucide-react';
 import { supabase, Credit } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
@@ -14,7 +14,6 @@ export default function CreditPanel() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Check if user can mark credits as paid (only managers and admins)
   const canMarkAsPaid = user?.role === 'admin' || user?.role === 'manager';
   const canAddCredits = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'worker';
 
@@ -35,7 +34,6 @@ export default function CreditPanel() {
 
       if (error) throw error;
 
-      // Update overdue status
       const today = new Date().toISOString().split('T')[0];
       const updatedCredits = (data || []).map(credit => ({
         ...credit,
@@ -44,7 +42,6 @@ export default function CreditPanel() {
 
       setCredits(updatedCredits);
     } catch (error) {
-      console.error('Error fetching credits:', error);
       toast.error('Error loading credits');
     } finally {
       setLoading(false);
@@ -52,7 +49,6 @@ export default function CreditPanel() {
   };
 
   const handleMarkAsPaid = async (creditId: string) => {
-    // Double-check permissions before allowing action
     if (!canMarkAsPaid) {
       toast.error('You do not have permission to mark credits as paid');
       return;
@@ -69,7 +65,6 @@ export default function CreditPanel() {
       toast.success('Credit marked as paid');
       fetchCredits();
     } catch (error) {
-      console.error('Error updating credit status:', error);
       toast.error('Error updating credit status');
     }
   };
@@ -83,11 +78,10 @@ export default function CreditPanel() {
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate metrics for dashboard integration
   const totalPending = credits.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
   const totalOverdue = credits.filter(c => c.status === 'overdue').reduce((sum, c) => sum + c.amount, 0);
   const totalPaid = credits.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
-  const totalCash = totalPaid; // Cash represents paid credits
+  const totalCash = totalPaid;
   const pendingCount = credits.filter(c => c.status === 'pending').length;
   const overdueCount = credits.filter(c => c.status === 'overdue').length;
   const paidCount = credits.filter(c => c.status === 'paid').length;

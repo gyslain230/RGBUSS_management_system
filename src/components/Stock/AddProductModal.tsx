@@ -56,7 +56,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
             product_name: data.name,
             adjustment_type: 'increase',
             quantity_adjusted: data.quantity,
-            previous_quantity: 0, // New product starts from 0
+            previous_quantity: 0,
             new_quantity: data.quantity,
             reason: 'Initial stock entry for new product',
             adjusted_by: user.id,
@@ -64,8 +64,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
           }]);
 
         if (adjustmentError) {
-          console.error('Error recording stock adjustment:', adjustmentError);
-          // Don't fail the product creation if adjustment recording fails
+          console.warn('Stock adjustment recording failed');
         }
       }
 
@@ -74,7 +73,6 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
       reset();
       onSuccess();
     } catch (error) {
-      console.error('Error adding product:', error);
       toast.error('Error adding product');
     } finally {
       setLoading(false);
@@ -195,7 +193,6 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
               />
             </div>
 
-            {/* Information Box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="text-sm text-blue-800">
                 <p className="font-medium mb-1">📊 Daily Reports Integration</p>
@@ -210,7 +207,6 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
           </form>
         </div>
 
-        {/* Fixed Footer */}
         <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl flex-shrink-0">
           <div className="flex space-x-3">
             <button

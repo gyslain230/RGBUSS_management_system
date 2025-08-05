@@ -55,22 +55,10 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
     try {
       const previousQuantity = currentQuantity;
       
-      // Ensure proper numeric calculation
       const newQuantity = data.adjustment_type === 'increase' 
         ? previousQuantity + adjustmentQuantity 
         : previousQuantity - adjustmentQuantity;
 
-      console.log('Stock Adjustment Calculation:', {
-        previousQuantity,
-        adjustmentQuantity,
-        adjustmentType: data.adjustment_type,
-        newQuantity,
-        calculation: data.adjustment_type === 'increase' 
-          ? `${previousQuantity} + ${adjustmentQuantity} = ${newQuantity}`
-          : `${previousQuantity} - ${adjustmentQuantity} = ${newQuantity}`
-      });
-
-      // Update product quantity
       const { error: updateError } = await supabase
         .from('products')
         .update({ 
@@ -81,7 +69,6 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
 
       if (updateError) throw updateError;
 
-      // Record the adjustment
       const { error: adjustmentError } = await supabase
         .from('stock_adjustments')
         .insert([{
@@ -106,7 +93,6 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error adjusting stock:', error);
       toast.error('Error adjusting stock');
     } finally {
       setLoading(false);

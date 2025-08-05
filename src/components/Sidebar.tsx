@@ -60,13 +60,11 @@ export default function Sidebar() {
 
   return (
     <div className="h-full bg-white dark:bg-gray-800 shadow-lg border-r border-gray-200 dark:border-gray-700 flex flex-col">
-      {/* Logo Section */}
       <div className="flex items-center flex-shrink-0 px-6 py-6 border-b border-gray-200 dark:border-gray-700">
         <Store className="h-8 w-8 text-blue-600" />
         <span className="ml-3 text-xl font-bold text-gray-900 dark:text-white">RGBUSS</span>
       </div>
       
-      {/* Navigation - Scrollable if needed */}
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {filteredNavigation.map((item) => (
           <NavLink
@@ -95,7 +93,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User Info Section - Fixed at bottom */}
       <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center">
           <div className="flex-shrink-0">

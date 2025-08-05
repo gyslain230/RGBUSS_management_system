@@ -1,39 +1,30 @@
 import React from 'react';
-import { Menu, Bell, LogOut, Mail, Clock } from 'lucide-react';
+import { Bell, LogOut, Mail, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 
 export default function Header() {
   const { user, signOut, sessionTimeRemaining, extendSession } = useAuth();
 
-  // Format time remaining for display
   const formatTimeRemaining = (milliseconds: number) => {
     const minutes = Math.floor(milliseconds / 60000);
     const seconds = Math.floor((milliseconds % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Show session timer if less than 5 minutes remaining
-  const showSessionTimer = sessionTimeRemaining < 5 * 60 * 1000; // 5 minutes
+  const showSessionTimer = sessionTimeRemaining < 5 * 60 * 1000;
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <button
-              type="button"
-              className="md:hidden p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
             <h1 className="ml-4 text-xl font-semibold text-gray-900 dark:text-white">
               Business Management System
             </h1>
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Session Timer */}
             {user && showSessionTimer && (
               <div className="flex items-center space-x-2">
                 <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
@@ -53,7 +44,6 @@ export default function Header() {
               </div>
             )}
 
-            {/* Theme Toggle */}
             <ThemeToggle />
 
             <button className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 relative transition-colors">

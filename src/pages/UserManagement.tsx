@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Trash2, Shield, Mail } from 'lucide-react';
+import { Users, Plus, Trash2, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -36,7 +36,6 @@ export default function UserManagement() {
       if (error) throw error;
       setUsers(data || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
       toast.error('Error loading users');
     } finally {
       setLoading(false);
@@ -62,13 +61,9 @@ export default function UserManagement() {
 
       if (profileError) throw profileError;
 
-      // Note: In a production environment, you would also need to delete the user from auth.users
-      // This requires admin privileges and should be done server-side
-      
       toast.success('User deleted successfully');
       fetchUsers();
     } catch (error) {
-      console.error('Error deleting user:', error);
       toast.error('Error deleting user');
     }
   };
@@ -85,7 +80,6 @@ export default function UserManagement() {
       toast.success('User role updated successfully');
       fetchUsers();
     } catch (error) {
-      console.error('Error updating user role:', error);
       toast.error('Error updating user role');
     }
   };

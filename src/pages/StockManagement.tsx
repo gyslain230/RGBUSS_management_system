@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Package, History, Settings, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Package, History, Settings, AlertTriangle } from 'lucide-react';
 import { supabase, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -25,7 +25,6 @@ export default function StockManagement() {
 
   const fetchProducts = async () => {
     try {
-      // All products are now automatically approved, so we just fetch all products
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -34,7 +33,6 @@ export default function StockManagement() {
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
       toast.error('Error loading products');
     } finally {
       setLoading(false);
@@ -60,7 +58,6 @@ export default function StockManagement() {
 
   const categories = Array.from(new Set(products.map(p => p.category)));
 
-  // Check if user can adjust stock (workers, managers, and admins)
   const canAdjustStock = user?.role === 'worker' || user?.role === 'manager' || user?.role === 'admin';
 
   if (loading) {
