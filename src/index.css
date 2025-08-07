@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS Variables for theme colors */
 :root {
   --toast-bg: #363636;
   --toast-color: #fff;
@@ -13,12 +12,10 @@
   --toast-color: #f9fafb;
 }
 
-/* Smooth transitions for theme changes */
 * {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom scrollbar for dark mode */
 .dark ::-webkit-scrollbar {
   width: 8px;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Store, Mail, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { Eye, EyeOff, Store, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSupabaseReady } from '../../lib/supabase';
 import ThemeToggle from '../ThemeToggle';
@@ -18,10 +18,8 @@ export default function LoginForm() {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
-  // If user is already authenticated, redirect
   React.useEffect(() => {
     if (user && !authLoading) {
-      console.log('LoginForm: User already authenticated, redirecting to:', from);
       navigate(from, { replace: true });
     }
   }, [user, authLoading, navigate, from]);
@@ -51,27 +49,16 @@ export default function LoginForm() {
 
     setSubmitting(true);
     try {
-      console.log('LoginForm: Starting sign in process...');
       await signIn(email.trim(), password);
-      
-      // Wait for auth state to update, then navigate
-      console.log('LoginForm: Sign in initiated, waiting for auth state...');
-      
-      // Use a timeout to navigate after auth state should have updated
       setTimeout(() => {
-        console.log('LoginForm: Navigating to:', from);
         navigate(from, { replace: true });
       }, 3000);
-      
     } catch (error: any) {
-      console.error('LoginForm: Login error:', error);
-      // Error handling is done in AuthContext with specific messages
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Show loading state if either form is submitting or auth is loading
   const isLoading = submitting || authLoading;
 
   return (
@@ -97,35 +84,6 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {/* Connection Status */}
-        <div className={`p-4 rounded-lg border ${
-          isSupabaseReady() 
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-        }`}>
-          <div className="flex items-center">
-            {isSupabaseReady() ? (
-              <Wifi className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
-            ) : (
-              <WifiOff className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
-            )}
-            <div>
-              <p className={`text-sm font-medium ${
-                isSupabaseReady() ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
-              }`}>
-                {isSupabaseReady() ? 'Connected to Supabase' : 'Supabase Not Configured'}
-              </p>
-              <p className={`text-xs ${
-                isSupabaseReady() ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-              }`}>
-                {isSupabaseReady() 
-                  ? 'Authentication service is ready' 
-                  : 'Please set up your Supabase project'
-                }
-              </p>
-            </div>
-          </div>
-        </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
@@ -221,7 +179,6 @@ export default function LoginForm() {
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mt-0.5"></div>
-              <div className="ml-3">
                 <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
                   {submitting ? 'Authenticating...' : 'Loading your profile...'}
                 </h3>
@@ -236,37 +193,11 @@ export default function LoginForm() {
                 </p>
               </div>
             </div>
-          </div>
-        )}
-
         {/* Authentication Tips */}
         {!isLoading && isSupabaseReady() && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex">
               <AlertCircle className="h-5 w-5 text-blue-400 dark:text-blue-300 mt-0.5" />
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                  Authentication Tips
-                </h3>
-                <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Make sure you have a stable internet connection</li>
-                    <li>If login is slow, please wait - the system is processing your request</li>
-                    <li>Create an account first if you don't have one</li>
-                    <li>Contact your administrator if you continue having issues</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Supabase Configuration Warning */}
-        {!isSupabaseReady() && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-red-400 dark:text-red-300 mt-0.5" />
-              <div className="ml-3">
                 <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
                   Supabase Configuration Required
                 </h3>
@@ -285,7 +216,6 @@ export default function LoginForm() {
           </div>
         )}
 
-        {/* Development credentials info */}
         {isSupabaseReady() && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <div className="text-sm text-green-700 dark:text-green-300">
@@ -293,14 +223,6 @@ export default function LoginForm() {
               <p className="text-xs">
                 Create an account using the Register page, then sign in here.
               </p>
-              <div className="mt-2">
-                <Link
-                  to="/register"
-                  className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 text-sm font-medium"
-                >
-                  Go to Registration →
-                </Link>
-              </div>
             </div>
           </div>
         )}
