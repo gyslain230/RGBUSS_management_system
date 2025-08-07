@@ -47,6 +47,7 @@ export default function DailyReports() {
 
   const getPreviousDayStock = async (productId: string, currentDate: string) => {
     try {
+      const previousDate = format(subDays(new Date(currentDate), 1), 'yyyy-MM-dd');
       
       // First check stored reports for previous day
       const { data: storedReport } = await supabase
@@ -58,6 +59,7 @@ export default function DailyReports() {
 
       if (storedReport) {
         return storedReport.solde;
+      }
 
       // Fallback to stock adjustments
       const { data: historicalAdjustments, error } = await supabase
@@ -68,10 +70,10 @@ export default function DailyReports() {
         .order('created_at', { ascending: false })
         .limit(1);
 
-
       if (!historicalAdjustments || historicalAdjustments.length === 0) {
         return 0;
       }
+      
       const lastAdjustment = historicalAdjustments[0];
       return lastAdjustment.new_quantity;
     } catch (error) {
