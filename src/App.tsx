@@ -19,37 +19,11 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
-          <div className="App">
-            <Toaster 
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: 'var(--toast-bg)',
-                  color: 'var(--toast-color)',
-                },
-                success: {
-                  duration: 3000,
-                  iconTheme: {
-                    primary: '#4ade80',
-                    secondary: '#fff',
-                  },
-                },
-                error: {
-                  duration: 5000,
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#fff',
-                  },
-                },
-              }}
-            />
+          <Toaster position="top-right" />
             <Routes>
-              {/* Public Routes */}
               <Route path="/login" element={<LoginForm />} />
               <Route path="/register" element={<RegisterForm />} />
               
-              {/* Protected Routes */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Layout>
@@ -98,13 +72,9 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Default redirect - redirect to login instead of dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              
-              {/* Catch all route - redirect to login instead of dashboard */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-          </div>
         </Router>
       </AuthProvider>
     </ThemeProvider>
