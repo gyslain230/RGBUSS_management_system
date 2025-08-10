@@ -253,20 +253,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, lastActivity, inactivityTimer, warningShown]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
-      await signOut();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [user]);
-
   const extendSession = () => {
     setLastActivity(Date.now());
     setWarningShown(false);
