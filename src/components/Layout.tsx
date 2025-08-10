@@ -10,12 +10,6 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { user, loading, extendSession } = useAuth();
 
-  const handleUserActivity = () => {
-    if (user) {
-      extendSession();
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -37,14 +31,8 @@ export default function Layout({ children }: LayoutProps) {
     );
   }
 
-
   return (
-    <div 
-      className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50 dark:bg-gray-900"
-      onClick={handleUserActivity}
-      onKeyDown={handleUserActivity}
-      onMouseMove={handleUserActivity}
-    >
+    <div className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50 dark:bg-gray-900">
       <div className="hidden md:block">
         <Sidebar />
       </div>
