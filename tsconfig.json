@@ -4,3 +4,6 @@
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
   ]
+}
+// This file is required by the TypeScript compiler to understand the project structure
+// and to manage the references to other TypeScript configuration files.
