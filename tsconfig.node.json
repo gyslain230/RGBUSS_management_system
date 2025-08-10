@@ -17,3 +17,4 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["vite.config.ts"]
+}
