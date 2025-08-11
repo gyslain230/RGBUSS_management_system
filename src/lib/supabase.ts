@@ -55,6 +55,31 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : createMockClient() as any;
 
+// Cache for frequently accessed data
+const cache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to get cached data or fetch new data
+const getCachedData = async (key: string, fetchFn: () => Promise<any>) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  
+  const data = await fetchFn();
+  cache.set(key, { data, timestamp: Date.now() });
+  return data;
+};
+
+// Clear cache function
+export const clearCache = (key?: string) => {
+  if (key) {
+    cache.delete(key);
+  } else {
+    cache.clear();
+  }
+};
+
 export interface User {
   id: string;
   email: string;
@@ -140,48 +165,33 @@ export const getCurrentUser = async (): Promise<User | null> => {
     return null;
   }
 
+  // Use cache for current user to avoid repeated calls
+  const cacheKey = 'current_user';
+  
   try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 10000);
-    });
+    return await getCachedData(cacheKey, async () => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 5000); // Reduced timeout
+      });
 
-    const userPromise = supabase.auth.getUser();
-    const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
-    
-    if (userError) {
-      if (userError.message?.includes('Failed to fetch') || 
-          userError.message?.includes('fetch') ||
-          userError.message?.includes('timeout') ||
-          userError.message?.includes('network')) {
-        throw new Error('Unable to connect to authentication service. Please check your internet connection and Supabase configuration.');
-      }
+      const userPromise = supabase.auth.getUser();
+      const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
       
-      return null;
-    }
-    
-    if (!user) {
-      return null;
-    }
-
-    const profilePromise = supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
-
-    if (profileError) {
-      if (profileError.message?.includes('Failed to fetch') || 
-          profileError.message?.includes('fetch') ||
-          profileError.message?.includes('timeout') ||
-          profileError.message?.includes('network')) {
-        throw new Error('Unable to connect to database service. Please check your internet connection and Supabase configuration.');
+      if (userError || !user) {
+        return null;
       }
-      
-      if (profileError.code === 'PGRST116') {
-        try {
-          const { data: newProfile, error: createError } = await supabase
+
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
+
+      if (profileError) {
+        if (profileError.code === 'PGRST116') {
+          const { data: newProfile } = await supabase
             .from('profiles')
             .insert([{
               id: user.id,
@@ -191,40 +201,100 @@ export const getCurrentUser = async (): Promise<User | null> => {
             }])
             .select()
             .single();
-
-          if (createError) {
-            return null;
-          }
-
           return newProfile;
-        } catch (createError) {
-          return null;
         }
-      } else if (profileError.code === '42501') {
-        return null;
-      } else {
         return null;
       }
-    }
 
-    if (!profile) {
-      return null;
-    }
-
-    return profile;
+      return profile;
+    });
   } catch (error: any) {
-    if (error.message?.includes('Supabase configuration') || 
-        error.message?.includes('authentication service') ||
-        error.message?.includes('database service')) {
-      throw error;
-    }
-    
-    if (error.message?.includes('timeout')) {
-      throw new Error('Request timed out. Please check your internet connection and try again.');
-    }
-    
+    clearCache(cacheKey);
     return null;
   }
+};
+
+// Optimized function to get products with caching
+export const getProducts = async () => {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const cacheKey = 'products';
+  return await getCachedData(cacheKey, async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, price, quantity, category, status, created_at')
+      .eq('status', 'approved')
+      .order('name');
+    
+    if (error) throw error;
+    return data || [];
+  });
+};
+
+// Optimized function to get credits with caching
+export const getCredits = async (userId?: string) => {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const cacheKey = `credits_${userId || 'all'}`;
+  return await getCachedData(cacheKey, async () => {
+    let query = supabase
+      .from('credits')
+      .select('id, customer_name, amount, product_name, status, due_date, created_at')
+      .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('issued_by', userId);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  });
+};
+
+// Optimized function to get users with caching
+export const getUsers = async () => {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const cacheKey = 'users';
+  return await getCachedData(cacheKey, async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, role, created_at')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  });
+};
+
+// Optimized function to get stock adjustments with caching
+export const getStockAdjustments = async (productId?: string) => {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const cacheKey = `stock_adjustments_${productId || 'all'}`;
+  return await getCachedData(cacheKey, async () => {
+    let query = supabase
+      .from('stock_adjustments')
+      .select('id, product_name, adjustment_type, quantity_adjusted, previous_quantity, new_quantity, reason, adjusted_by_name, created_at')
+      .order('created_at', { ascending: false });
+
+    if (productId) {
+      query = query.eq('product_id', productId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  });
 };
 
 export const signInWithEmail = async (email: string, password: string) => {

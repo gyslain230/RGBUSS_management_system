@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { supabase } from '../../lib/supabase';
+import { supabase, clearCache } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -70,6 +70,7 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
 
       toast.success(`Product added successfully! ${data.quantity > 0 ? 'Initial stock recorded as entres.' : ''}`);
       
+      clearCache('products');
       reset();
       onSuccess();
     } catch (error) {

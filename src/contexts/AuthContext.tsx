@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [warningShown, setWarningShown] = useState(false);
   const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null);
+  const [userCache, setUserCache] = useState<User | null>(null);
 
   useEffect(() => {
     if (!isSupabaseReady()) {
@@ -48,46 +49,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
+    // Check if we have cached user data first
+    if (userCache) {
+      setUser(userCache);
+      setLoading(false);
+    }
+    
     const getInitialSession = async () => {
       try {
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timeout')), 10000);
-        });
-
-        const sessionPromise = supabase.auth.getSession();
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error) {
-          if (error.message?.includes('Failed to fetch') || 
-              error.message?.includes('fetch') ||
-              error.message?.includes('network') ||
-              error.message?.includes('timeout')) {
-            toast.error('Unable to connect to authentication service. Please check your connection.');
-          }
-          
+        if (error || !session?.user) {
           setLoading(false);
           return;
         }
         
-        if (session?.user) {
-          try {
-            const profile = await getCurrentUser();
-            
-            if (profile) {
-              setUser(profile);
-            }
-          } catch (profileError: any) {
-            if (profileError.message?.includes('Supabase configuration') ||
-                profileError.message?.includes('authentication service') ||
-                profileError.message?.includes('database service')) {
-              toast.error('Database connection error. Please check your Supabase configuration.');
-            }
-          }
+        const profile = await getCurrentUser();
+        if (profile) {
+          setUser(profile);
+          setUserCache(profile);
         }
       } catch (error: any) {
-        if (error.message?.includes('timeout')) {
-          toast.error('Connection timeout. Please check your internet connection.');
-        }
+        console.error('Session check error:', error);
       } finally {
         setLoading(false);
       }
@@ -96,67 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getInitialSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const timeoutId = setTimeout(() => {
-        setLoading(false);
-      }, 15000); // 15 second timeout
-      
       try {
         if (event === 'SIGNED_IN' && session?.user) {
           setLoading(true);
           
-          try {
-            let retries = 2;
-            let profile = null;
-            
-            while (retries > 0 && !profile) {
-              try {
-                const profilePromise = getCurrentUser();
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(() => reject(new Error('Profile loading timeout')), 8000);
-                });
-                
-                profile = await Promise.race([profilePromise, timeoutPromise]);
-                
-                if (profile) {
-                  setUser(profile);
-                  clearTimeout(timeoutId);
-                  setLoading(false);
-                  return;
-                }
-              } catch (profileError: any) {
-                retries--;
-                
-                if (retries > 0) {
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                } else {
-                  if (profileError.message?.includes('timeout')) {
-                    toast.error('Profile loading timed out. Please refresh the page.');
-                  } else if (profileError.message?.includes('Supabase configuration') ||
-                           profileError.message?.includes('authentication service') ||
-                           profileError.message?.includes('database service')) {
-                    toast.error('Database connection error. Please check your Supabase configuration.');
-                  } else {
-                    toast.error('Error loading user profile. Please try refreshing the page.');
-                  }
-                }
-              }
-            }
-            
-          } catch (profileError: any) {
-            toast.error('Error loading user profile. Please try again.');
+          const profile = await getCurrentUser();
+          if (profile) {
+            setUser(profile);
+            setUserCache(profile);
           }
+          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
-          clearTimeout(timeoutId);
-          setLoading(false);
-        } else if (event === 'TOKEN_REFRESHED') {
-          clearTimeout(timeoutId);
-        } else {
-          clearTimeout(timeoutId);
+          setUserCache(null);
           setLoading(false);
         }
       } catch (error) {
-        clearTimeout(timeoutId);
         setLoading(false);
       }
     });

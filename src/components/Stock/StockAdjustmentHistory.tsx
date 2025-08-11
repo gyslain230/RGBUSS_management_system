@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { History, Plus, Minus, Search } from 'lucide-react';
-import { supabase, StockAdjustment } from '../../lib/supabase';
+import { getStockAdjustments, StockAdjustment } from '../lib/supabase';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -19,19 +19,8 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
 
   const fetchAdjustments = async () => {
     try {
-      let query = supabase
-        .from('stock_adjustments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (productId) {
-        query = query.eq('product_id', productId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setAdjustments(data || []);
+      const adjustments = await getStockAdjustments(productId);
+      setAdjustments(adjustments);
     } catch (error) {
       toast.error('Error loading adjustment history');
     } finally {
@@ -48,8 +37,15 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="space-y-4">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Trash2, Shield, Mail } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { getUsers, clearCache, supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/Users/AddUserModal';
@@ -28,13 +28,8 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
+      const users = await getUsers();
+      setUsers(users);
     } catch (error) {
       toast.error('Error loading users');
     } finally {
@@ -61,6 +56,7 @@ export default function UserManagement() {
       if (profileError) throw profileError;
 
       toast.success('User deleted successfully');
+      clearCache('users');
       fetchUsers();
     } catch (error) {
       toast.error('Error deleting user');
@@ -77,6 +73,7 @@ export default function UserManagement() {
       if (error) throw error;
 
       toast.success('User role updated successfully');
+      clearCache('users');
       fetchUsers();
     } catch (error) {
       toast.error('Error updating user role');
@@ -222,6 +219,7 @@ export default function UserManagement() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
+            clearCache('users');
             fetchUsers();
           }}
         />

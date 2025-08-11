@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Package, History, Settings, AlertTriangle } from 'lucide-react';
-import { supabase, Product } from '../lib/supabase';
+import { getProducts, clearCache, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddProductModal from '../components/Stock/AddProductModal';
@@ -25,13 +25,8 @@ export default function StockManagement() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProducts(data || []);
+      const products = await getProducts();
+      setProducts(products);
     } catch (error) {
       toast.error('Error loading products');
     } finally {
@@ -271,6 +266,7 @@ export default function StockManagement() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
+            clearCache('products');
             fetchProducts();
           }}
         />
@@ -288,6 +284,7 @@ export default function StockManagement() {
           onSuccess={() => {
             setShowAdjustmentModal(false);
             setSelectedProduct(null);
+            clearCache('products');
             fetchProducts();
           }}
         />

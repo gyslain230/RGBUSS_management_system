@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Minus, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { supabase, Product } from '../../lib/supabase';
+import { supabase, clearCache, Product } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -89,6 +89,9 @@ export default function StockAdjustmentModal({ isOpen, onClose, product, onSucce
         `Stock ${data.adjustment_type === 'increase' ? 'increased' : 'decreased'} successfully! ${previousQuantity} → ${newQuantity}`
       );
       
+      clearCache('products');
+      clearCache('stock_adjustments_all');
+      clearCache(`stock_adjustments_${product.id}`);
       reset();
       onSuccess();
       onClose();

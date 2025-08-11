@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Search, AlertTriangle, CheckCircle, Plus, DollarSign } from 'lucide-react';
-import { supabase, Credit } from '../lib/supabase';
+import { getCredits, clearCache, supabase, Credit } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -23,19 +23,10 @@ export default function CreditPanel() {
 
   const fetchCredits = async () => {
     try {
-      let query = supabase.from('credits').select('*');
-
-      // Workers can only see credits they issued
-      if (user?.role === 'worker') {
-        query = query.eq('issued_by', user.id);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const credits = await getCredits(user?.role === 'worker' ? user.id : undefined);
 
       const today = new Date().toISOString().split('T')[0];
-      const updatedCredits = (data || []).map(credit => ({
+      const updatedCredits = credits.map(credit => ({
         ...credit,
         status: credit.status === 'pending' && credit.due_date < today ? 'overdue' : credit.status
       }));
@@ -341,6 +332,8 @@ export default function CreditPanel() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
+            clearCache('credits_all');
+            clearCache(`credits_${user?.id}`);
             fetchCredits();
           }}
         />

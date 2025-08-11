@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Package, DollarSign, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { getProducts, getUsers, getCredits } from '../lib/supabase';
 
 interface DashboardStats {
   totalProducts: number;
@@ -30,25 +30,25 @@ export default function Dashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const [productsResult, usersResult, creditsResult] = await Promise.all([
-        supabase.from('products').select('*', { count: 'exact' }),
-        supabase.from('users').select('*', { count: 'exact' }),
-        supabase.from('credits').select('amount')
+      const [products, users, credits] = await Promise.all([
+        getProducts(),
+        getUsers(),
+        getCredits()
       ]);
 
-      const totalCredits = creditsResult.data?.reduce((sum, credit) => sum + Number(credit.amount || 0), 0) || 0;
-      const lowStockProducts = productsResult.data?.filter(p => Number(p.quantity) < 10).length || 0;
+      const totalCredits = credits.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
+      const lowStockProducts = products.filter(p => Number(p.quantity) < 10).length;
 
       setStats({
-        totalProducts: productsResult.count || 0,
+        totalProducts: products.length,
         totalSales: 0,
-        totalUsers: usersResult.count || 0,
+        totalUsers: users.length,
         totalCredits,
         lowStockProducts,
         todayRevenue: 0
       });
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      // Silently handle errors to avoid console spam
     } finally {
       setLoading(false);
     }
@@ -56,8 +56,19 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 animate-pulse">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

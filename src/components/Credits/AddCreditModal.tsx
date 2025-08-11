@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard, User, DollarSign, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { supabase, Product } from '../../lib/supabase';
+import { supabase, getProducts, clearCache, Product } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -48,14 +48,8 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('status', 'approved')
-        .order('name');
-
-      if (error) throw error;
-      setProducts(data || []);
+      const products = await getProducts();
+      setProducts(products);
     } catch (error) {
       toast.error('Error loading products');
     }
@@ -81,6 +75,8 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
       if (error) throw error;
 
       toast.success('Credit added successfully!');
+      clearCache('credits_all');
+      clearCache(`credits_${user?.id}`);
       reset();
       setSelectedProduct(null);
       onSuccess();

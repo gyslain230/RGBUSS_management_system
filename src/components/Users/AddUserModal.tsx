@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, clearCache } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 interface AddUserModalProps {
@@ -35,6 +35,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     try {
       await signUp(data.email, data.password, data.fullName, data.role);
       toast.success('User created successfully!');
+      clearCache('users');
       reset();
       onSuccess();
       onClose();
