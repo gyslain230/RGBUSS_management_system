@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { History, Plus, Minus, Search } from 'lucide-react';
-import { getStockAdjustments, StockAdjustment } from '../lib/supabase';
-import { format } from 'date-fns';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { History, Plus, Minus, Search } from "lucide-react";
+import { getStockAdjustments, StockAdjustment } from "../../lib/supabase";
+import { format } from "date-fns";
+import toast from "react-hot-toast";
 
 interface StockAdjustmentHistoryProps {
   productId?: string;
 }
 
-export default function StockAdjustmentHistory({ productId }: StockAdjustmentHistoryProps) {
+export default function StockAdjustmentHistory({
+  productId,
+}: StockAdjustmentHistoryProps) {
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchAdjustments();
@@ -22,16 +24,21 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
       const adjustments = await getStockAdjustments(productId);
       setAdjustments(adjustments);
     } catch (error) {
-      toast.error('Error loading adjustment history');
+      toast.error("Error loading adjustment history");
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredAdjustments = adjustments.filter(adjustment => {
-    const matchesSearch = adjustment.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         adjustment.adjusted_by_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         adjustment.reason.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredAdjustments = adjustments.filter((adjustment) => {
+    const matchesSearch =
+      adjustment.product_name
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      adjustment.adjusted_by_name
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      adjustment.reason.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
@@ -42,7 +49,10 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
           <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div
+                key={i}
+                className="h-12 bg-gray-200 dark:bg-gray-700 rounded"
+              ></div>
             ))}
           </div>
         </div>
@@ -56,7 +66,9 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
         <div className="flex items-center space-x-2">
           <History className="h-5 w-5 text-blue-600" />
           <h3 className="text-lg font-semibold text-gray-900">
-            {productId ? 'Product Adjustment History' : 'Stock Adjustment History'}
+            {productId
+              ? "Product Adjustment History"
+              : "Stock Adjustment History"}
           </h3>
         </div>
         <span className="text-sm text-gray-600">
@@ -120,9 +132,14 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
                   <tr key={adjustment.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>
-                        <div>{format(new Date(adjustment.created_at), 'MMM dd, yyyy')}</div>
+                        <div>
+                          {format(
+                            new Date(adjustment.created_at),
+                            "MMM dd, yyyy"
+                          )}
+                        </div>
                         <div className="text-xs text-gray-500">
-                          {format(new Date(adjustment.created_at), 'HH:mm')}
+                          {format(new Date(adjustment.created_at), "HH:mm")}
                         </div>
                       </div>
                     </td>
@@ -132,31 +149,42 @@ export default function StockAdjustmentHistory({ productId }: StockAdjustmentHis
                       </td>
                     )}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        adjustment.adjustment_type === 'increase'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {adjustment.adjustment_type === 'increase' ? (
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          adjustment.adjustment_type === "increase"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {adjustment.adjustment_type === "increase" ? (
                           <Plus className="h-3 w-3 mr-1" />
                         ) : (
                           <Minus className="h-3 w-3 mr-1" />
                         )}
-                        {adjustment.adjustment_type === 'increase' ? 'Increase' : 'Decrease'}
+                        {adjustment.adjustment_type === "increase"
+                          ? "Increase"
+                          : "Decrease"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className={`font-medium ${
-                        adjustment.adjustment_type === 'increase' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {adjustment.adjustment_type === 'increase' ? '+' : '-'}{adjustment.quantity_adjusted}
+                      <span
+                        className={`font-medium ${
+                          adjustment.adjustment_type === "increase"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {adjustment.adjustment_type === "increase" ? "+" : "-"}
+                        {adjustment.quantity_adjusted}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center space-x-2">
                         <span>{adjustment.previous_quantity}</span>
                         <span className="text-gray-400">→</span>
-                        <span className="font-medium">{adjustment.new_quantity}</span>
+                        <span className="font-medium">
+                          {adjustment.new_quantity}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
