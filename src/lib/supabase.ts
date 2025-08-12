@@ -302,26 +302,67 @@ export const signInWithEmail = async (email: string, password: string) => {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
+  // Input validation
+  if (!email || !password) {
+    throw new Error('Email and password are required');
+  }
+
+  if (!email.includes('@') || email.length < 5) {
+    throw new Error('Please enter a valid email address');
+  }
+
+  if (password.length < 6) {
+    throw new Error('Password must be at least 6 characters long');
+  }
+
   try {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Sign in request timeout')), 15000);
     });
 
     const signInPromise = supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     });
 
     const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
 
     if (error) {
+      // Log security-relevant errors
+      console.error('Sign in error:', error.message);
+      
       if (error.message?.includes('Failed to fetch') || 
           error.message?.includes('fetch') ||
           error.message?.includes('network')) {
         throw new Error('Unable to connect to authentication service. Please check your internet connection.');
       }
       
+      if (error.message?.includes('Invalid login credentials')) {
+        throw new Error('Invalid email or password. Please check your credentials.');
+      }
+      
+      if (error.message?.includes('Email not confirmed')) {
+        throw new Error('Please verify your email address before signing in.');
+      }
+      
+      if (error.message?.includes('Too many requests')) {
+        throw new Error('Too many login attempts. Please wait before trying again.');
+      }
+      
       throw error;
+    }
+
+    if (!data.user) {
+      throw new Error('Authentication failed - no user data returned');
+    }
+
+    if (!data.session) {
+      throw new Error('Authentication failed - no session created');
+    }
+
+    // Validate session expiry
+    if (data.session.expires_at && data.session.expires_at * 1000 < Date.now()) {
+      throw new Error('Session expired immediately after creation');
     }
 
     return data;
@@ -339,17 +380,38 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
+  // Input validation
+  if (!email || !password || !fullName) {
+    throw new Error('All fields are required');
+  }
+
+  if (!email.includes('@') || email.length < 5) {
+    throw new Error('Please enter a valid email address');
+  }
+
+  if (password.length < 6) {
+    throw new Error('Password must be at least 6 characters long');
+  }
+
+  if (fullName.trim().length < 2) {
+    throw new Error('Full name must be at least 2 characters long');
+  }
+
+  if (!['admin', 'manager', 'worker'].includes(role)) {
+    throw new Error('Invalid role specified');
+  }
+
   try {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Sign up request timeout')), 20000);
     });
 
     const signUpPromise = supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
       options: {
         data: {
-          full_name: fullName,
+          full_name: fullName.trim(),
           role: role
         }
       }
@@ -358,10 +420,24 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     const { data: authData, error: authError } = await Promise.race([signUpPromise, timeoutPromise]);
 
     if (authError) {
+      console.error('Sign up error:', authError.message);
+      
       if (authError.message?.includes('Failed to fetch') || 
           authError.message?.includes('fetch') ||
           authError.message?.includes('network')) {
         throw new Error('Unable to connect to authentication service. Please check your internet connection.');
+      }
+      
+      if (authError.message?.includes('User already registered')) {
+        throw new Error('A user with this email address already exists');
+      }
+      
+      if (authError.message?.includes('Password should be at least')) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+      
+      if (authError.message?.includes('Invalid email')) {
+        throw new Error('Please enter a valid email address');
       }
       
       throw new Error(`Authentication error: ${authError.message}`);
@@ -370,7 +446,6 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     if (!authData.user) {
       throw new Error('User creation failed - no user returned from authentication');
     }
-
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -386,16 +461,16 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     ]);
 
     if (profileCheckError && !profileCheckError.message?.includes('timeout')) {
+      console.warn('Profile check error:', profileCheckError.message);
     }
 
     if (!existingProfile) {
       const profileData = {
         id: authData.user.id,
-        email: email,
-        full_name: fullName,
+        email: email.trim().toLowerCase(),
+        full_name: fullName.trim(),
         role: role
       };
-
 
       const profileInsertPromise = supabase
         .from('profiles')
@@ -409,6 +484,8 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
       ]);
 
       if (profileError) {
+        console.error('Profile creation error:', profileError.message);
+        
         if (profileError.message?.includes('Failed to fetch') || 
             profileError.message?.includes('fetch') ||
             profileError.message?.includes('network') ||
@@ -461,8 +538,18 @@ export const signOut = async () => {
     const signOutPromise = supabase.auth.signOut();
     const { error } = await Promise.race([signOutPromise, timeoutPromise]);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Sign out error:', error.message);
+      throw error;
+    }
+    
+    // Clear any cached data
+    clearCache();
   } catch (error: any) {
+    console.error('Sign out failed:', error.message);
+    // Clear cache even if sign out fails
+    clearCache();
+    throw error;
   }
 };
 

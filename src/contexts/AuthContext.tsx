@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [warningShown, setWarningShown] = useState(false);
   const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null);
-  const [userCache, setUserCache] = useState<User | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseReady()) {
@@ -49,30 +49,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    // Check if we have cached user data first
-    if (userCache) {
-      setUser(userCache);
-      setLoading(false);
-    }
-    
     const getInitialSession = async () => {
       try {
+        // Clear any existing session data first
+        setUser(null);
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error || !session?.user) {
+        if (error) {
+          console.error('Session check error:', error);
+          await supabase.auth.signOut();
           setLoading(false);
+          setSessionChecked(true);
+          return;
+        }
+        
+        if (!session?.user) {
+          // No active session
+          setLoading(false);
+          setSessionChecked(true);
+          return;
+        }
+        
+        // Validate session is not expired
+        if (session.expires_at && session.expires_at * 1000 < Date.now()) {
+          console.warn('Session expired, signing out');
+          await supabase.auth.signOut();
+          setLoading(false);
+          setSessionChecked(true);
           return;
         }
         
         const profile = await getCurrentUser();
         if (profile) {
           setUser(profile);
-          setUserCache(profile);
+          setLastActivity(Date.now());
+        } else {
+          // Profile not found, sign out
+          await supabase.auth.signOut();
         }
       } catch (error: any) {
         console.error('Session check error:', error);
+        await supabase.auth.signOut();
       } finally {
         setLoading(false);
+        setSessionChecked(true);
       }
     };
 
@@ -80,21 +101,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (event === 'SIGNED_IN' && session?.user && sessionChecked) {
           setLoading(true);
+          
+          // Validate the session
+          if (session.expires_at && session.expires_at * 1000 < Date.now()) {
+            console.warn('Received expired session, signing out');
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
           
           const profile = await getCurrentUser();
           if (profile) {
             setUser(profile);
-            setUserCache(profile);
+            setLastActivity(Date.now());
+          } else {
+            await supabase.auth.signOut();
           }
           setLoading(false);
-        } else if (event === 'SIGNED_OUT') {
+        } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
           setUser(null);
-          setUserCache(null);
+          if (event === 'SIGNED_OUT') {
+            // Clear all local storage and session data
+            localStorage.clear();
+            sessionStorage.clear();
+          }
           setLoading(false);
         }
       } catch (error) {
+        console.error('Auth state change error:', error);
+        setUser(null);
         setLoading(false);
       }
     });
@@ -102,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [sessionChecked]);
 
   useEffect(() => {
     if (!user) {
@@ -202,7 +239,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Supabase not configured');
     }
 
+    // Validate input
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
+    if (!email.includes('@')) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
     try {
+      // Clear any existing session first
+      await supabase.auth.signOut();
+      
       const { user: authUser } = await signInWithEmail(email, password);
       
       if (!authUser) {
@@ -247,6 +300,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Supabase not configured');
     }
 
+    // Validate input
+    if (!email || !password || !fullName) {
+      throw new Error('All fields are required');
+    }
+
+    if (!email.includes('@')) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
+    if (fullName.trim().length < 2) {
+      throw new Error('Full name must be at least 2 characters long');
+    }
+
     try {
       const { user: authUser } = await signUpWithEmail(
         email, 
@@ -288,6 +358,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    try {
+      // Clear user state immediately
+      setUser(null);
+      setLoading(false);
+      
+      // Clear all timers
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        setInactivityTimer(null);
+      }
+      
+      setLastActivity(Date.now());
+      setWarningShown(false);
+      
+      // Clear local storage and session storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      if (!isSupabaseReady()) {
+        toast.success('Signed out successfully!');
+        return;
+      }
+
+      // Sign out from Supabase
+      await supabaseSignOut();
+      
+      toast.success('Signed out successfully!');
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      // Even if sign out fails, clear local state
+      setUser(null);
+      setLoading(false);
+      localStorage.clear();
+      sessionStorage.clear();
+      toast.success('Signed out successfully!');
+    }
+  };
+
+  const value = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    extendSession,
+    sessionTimeRemaining,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
     if (!isSupabaseReady()) {
       setUser(null);
       setLoading(false);

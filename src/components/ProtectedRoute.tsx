@@ -22,6 +22,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
+    // Clear any cached data when redirecting to login
+    localStorage.clear();
+    sessionStorage.clear();
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
