@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { useAuth, clearCache } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { clearCache } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface AddUserModalProps {
