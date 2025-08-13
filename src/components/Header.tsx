@@ -1,10 +1,10 @@
 import React from 'react';
-import { Bell, LogOut, Mail, Clock } from 'lucide-react';
+import { Bell, LogOut, Mail, Clock, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 
 export default function Header() {
-  const { user, signOut, sessionTimeRemaining, extendSession } = useAuth();
+  const { user, signOut, sessionTimeRemaining, extendSession, loading } = useAuth();
 
   const formatTimeRemaining = (milliseconds: number) => {
     const minutes = Math.floor(milliseconds / 60000);
@@ -13,6 +13,20 @@ export default function Header() {
   };
 
   const showSessionTimer = sessionTimeRemaining < 5 * 60 * 1000;
+  
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Force page reload to clear any remaining state
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Force logout even if there's an error
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -27,6 +41,7 @@ export default function Header() {
           <div className="flex items-center space-x-4">
             {user && showSessionTimer && (
               <div className="flex items-center space-x-2">
+                <Shield className="h-4 w-4 text-orange-500" />
                 <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
                   sessionTimeRemaining < 2 * 60 * 1000 
                     ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' 
@@ -67,8 +82,9 @@ export default function Header() {
                 </div>
               </div>
               <button
-                onClick={signOut}
-                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors"
+                onClick={handleSignOut}
+                disabled={loading}
+                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
                 title="Sign out"
               >
                 <LogOut className="h-5 w-5" />

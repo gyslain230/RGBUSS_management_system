@@ -114,6 +114,11 @@ export default function SalesManagement() {
       return;
     }
 
+    // Validate user permissions
+    if (!['admin', 'manager', 'worker'].includes(user.role)) {
+      toast.error('Insufficient permissions');
+      return;
+    }
     setSubmitting(true);
     try {
 

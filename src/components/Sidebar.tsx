@@ -8,7 +8,8 @@ import {
   CreditCard,
   Store,
   FileText,
-  Mail
+  Mail,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -96,10 +97,13 @@ export default function Sidebar() {
       <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center relative">
               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
                 {user?.full_name?.charAt(0).toUpperCase()}
               </span>
+              {user?.role === 'admin' && (
+                <Shield className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
+              )}
             </div>
           </div>
           <div className="ml-3 min-w-0 flex-1">
@@ -111,7 +115,7 @@ export default function Sidebar() {
               <span className="truncate">{user?.email}</span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-              {user?.role}
+              {user?.role} {user?.role === 'admin' && '👑'}
             </p>
           </div>
         </div>

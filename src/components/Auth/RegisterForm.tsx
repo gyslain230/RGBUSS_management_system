@@ -21,31 +21,71 @@ export default function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Input validation and sanitization
     if (!email || !password || !confirmPassword || !fullName) {
       toast.error('Please fill in all fields');
       return;
     }
 
-    if (!email.includes('@')) {
+    // Enhanced email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
       toast.error('Please enter a valid email address');
       return;
     }
 
+    // Enhanced password validation
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    // Password strength validation
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers) {
+      toast.error('Password must contain uppercase, lowercase, and numbers');
+      return;
+    }
+
+    // Full name validation
+    if (fullName.trim().length < 2) {
+      toast.error('Full name must be at least 2 characters long');
+      return;
+    }
+
+    // Role validation
+    if (!['admin', 'manager', 'worker'].includes(role)) {
+      toast.error('Invalid role selected');
       return;
     }
 
     setLoading(true);
     try {
-      await signUp(email.trim(), password, fullName.trim(), role);
+      // Sanitize inputs
+      const sanitizedEmail = email.trim().toLowerCase();
+      const sanitizedFullName = fullName.trim().replace(/[<>]/g, ''); // Basic XSS protection
+      
+      await signUp(sanitizedEmail, password, sanitizedFullName, role);
+      
+      // Clear form data for security
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setFullName('');
+      
       navigate('/login');
     } catch (error) {
+      // Clear password fields on error for security
+      setPassword('');
+      setConfirmPassword('');
     } finally {
       setLoading(false);
     }
@@ -124,7 +164,7 @@ export default function RegisterForm() {
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
+                Password (min 8 chars, mixed case + numbers)
               </label>
               <div className="mt-1 relative">
                 <input

@@ -14,7 +14,37 @@ import UserManagement from './pages/UserManagement';
 import CreditPanel from './pages/CreditPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 
+// Security: Clear any potentially cached auth data on app start
+const clearAuthCache = () => {
+  try {
+    // Clear localStorage items that might contain auth data
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('auth') || key.includes('session'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Clear sessionStorage
+    sessionStorage.clear();
+  } catch (error) {
+    console.warn('Failed to clear auth cache:', error);
+  }
+};
 function App() {
+  React.useEffect(() => {
+    // Security: Clear any stale auth data on app initialization
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceLogout = urlParams.get('logout');
+    
+    if (forceLogout === 'true') {
+      clearAuthCache();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
