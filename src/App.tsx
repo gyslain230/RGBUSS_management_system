@@ -37,7 +37,7 @@ window.addEventListener('error', (event) => {
   }
 });
 
-function App() {
+export default function App() {
   React.useEffect(() => {
     // Security: Enhanced auth cache clearing on app initialization
     const urlParams = new URLSearchParams(window.location.search);
@@ -155,5 +155,3 @@ function App() {
     </ThemeProvider>
   );
 }
-
-export default App;
