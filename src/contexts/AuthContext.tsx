@@ -40,6 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0);
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
 
+  // Track if session warning has been shown to prevent spam
+  const [sessionWarningShown, setSessionWarningShown] = useState(false);
+
   // Security: Complete auth data clearing on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -68,6 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             handleSessionExpiry();
             return 0;
           }
+          
+          // Show warning only once when session is about to expire
+          if (newTime <= 5 * 60 * 1000 && newTime > 4 * 60 * 1000 && !sessionWarningShown) {
+            setSessionWarningShown(true);
+            toast('Session will expire in 5 minutes', {
+              icon: '⏰',
+              duration: 4000,
+            });
+          }
+          
           return newTime;
         });
       }, 1000);
@@ -75,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionTimer(timer);
       return () => clearInterval(timer);
     }
-  }, [user, sessionTimeRemaining]);
+  }, [user, sessionTimeRemaining, sessionWarningShown]);
 
   // Security: Handle session expiry
   const handleSessionExpiry = useCallback(async () => {
@@ -282,6 +295,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const extendSession = useCallback(() => {
     if (user && sessionTimeRemaining > 0) {
       setSessionTimeRemaining(60 * 60 * 1000); // Reset to 1 hour
+      setSessionWarningShown(false); // Reset warning flag
       toast.success('Session extended for 1 hour');
     }
   }, [user, sessionTimeRemaining]);

@@ -58,7 +58,7 @@ export default function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
-            {user && showSessionTimer && (
+            {user && showSessionTimer && sessionTimeRemaining > 0 && (
               <div className="flex items-center space-x-2">
                 <Shield className="h-4 w-4 text-orange-500" />
                 <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
