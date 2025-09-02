@@ -497,9 +497,3 @@ export const logSecurityEvent = (event: string, details?: any): void => {
 
 
 export { sanitizeInput, logSecurityEvent }
-
-export { validateInput }
-
-export { initializeSecurity }
-
-export { clearAllStorage, loginRateLimiter, isValidEmail, validatePasswordStrength, sanitizeErrorMessage }
