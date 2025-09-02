@@ -265,7 +265,7 @@ class EnhancedRateLimiter {
     const timeWindow = record.blocked ? this.blockDuration : this.windowMs;
     return Math.max(0, timeWindow - elapsed);
   }
-};
+}
 
 export const loginRateLimiter = new EnhancedRateLimiter();
 
@@ -469,6 +469,7 @@ export const initializeSecurity = (): void => {
     });
   }
 };
+
 export const logSecurityEvent = (event: string, details?: any): void => {
   // In production, this would send to a secure logging service
   if (import.meta.env.DEV) {
@@ -491,3 +492,4 @@ export const logSecurityEvent = (event: string, details?: any): void => {
     
     localStorage.setItem('audit_logs', JSON.stringify(auditLogs));
   }
+};
