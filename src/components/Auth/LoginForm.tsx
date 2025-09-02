@@ -208,23 +208,25 @@ export default function LoginForm() {
           </div>
         )}
         {/* Authentication Tips */}
-        {!isLoading && isSupabaseReady() && (
+        {!isLoading && !isSupabaseReady() && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex">
               <AlertCircle className="h-5 w-5 text-blue-400 dark:text-blue-300 mt-0.5" />
-              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
                 Supabase Configuration Required
-              </h3>
-              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                <p>
-                  The authentication service is not configured. Please set up
-                  your Supabase project:
-                </p>
-                <ul className="list-disc list-inside mt-2 space-y-1">
-                  <li>Click "Connect to Supabase" in the top right corner</li>
-                  <li>Or configure your environment variables manually</li>
-                  <li>Ensure your Supabase URL and API key are correct</li>
-                </ul>
+                </h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  <p>
+                    The authentication service is not configured. Please set up
+                    your Supabase project:
+                  </p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Click "Connect to Supabase" in the top right corner</li>
+                    <li>Or configure your environment variables manually</li>
+                    <li>Ensure your Supabase URL and API key are correct</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
