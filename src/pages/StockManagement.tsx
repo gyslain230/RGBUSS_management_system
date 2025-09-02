@@ -129,6 +129,7 @@ export default function StockManagement() {
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
+          </div>
         </div>
       </div>
 
