@@ -349,6 +349,9 @@ export const signInWithEmail = async (email: string, password: string) => {
       }
     }
 
+    if (!data) {
+      throw new Error('Authentication failed - no response data');
+    }
     if (!data.user) {
       throw new Error('No user data returned');
     }
