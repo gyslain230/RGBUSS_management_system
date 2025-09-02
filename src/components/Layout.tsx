@@ -1,4 +1,5 @@
 import React from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { clearCache } from '../lib/supabase';
 import Sidebar from './Sidebar';
@@ -10,6 +11,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, loading, extendSession } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Security: Clear cache and validate session on layout mount
   React.useEffect(() => {
@@ -62,13 +64,11 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="h-screen grid grid-cols-1 md:grid-cols-[256px_1fr] bg-gray-50 dark:bg-gray-900">
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
+    <div className="h-screen flex bg-gray-50 dark:bg-gray-900">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
       <div className="flex flex-col min-h-0">
-        <Header />
+        <Header onMenuClick={() => setSidebarOpen(true)} />
         
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900">
           {children}

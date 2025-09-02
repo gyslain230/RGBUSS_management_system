@@ -1,9 +1,13 @@
 import React from 'react';
-import { Bell, LogOut, Mail, Clock, Shield } from 'lucide-react';
+import { Bell, LogOut, Mail, Clock, Shield, Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 
-export default function Header() {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+export default function Header({ onMenuClick }: HeaderProps) {
   const { user, signOut, sessionTimeRemaining, extendSession, loading } = useAuth();
 
   const formatTimeRemaining = (milliseconds: number) => {
@@ -52,6 +56,14 @@ export default function Header() {
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
+            {/* Mobile menu button */}
+            <button
+              onClick={onMenuClick}
+              className="md:hidden p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+            
             <h1 className="ml-4 text-xl font-semibold text-gray-900 dark:text-white">
               Business Management System
             </h1>
