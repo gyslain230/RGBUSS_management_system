@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, getCurrentUser, clearCache } from '../lib/supabase';
-import { clearAllStorage, isSessionValid, loginRateLimiter, sanitizeInput, isValidEmail, validatePassword } from '../utils/security';
+import { clearAllStorage, isSessionValid, loginRateLimiter, sanitizeInput, isValidEmail, validatePasswordStrength } from '../utils/security';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -242,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Please enter a valid email address');
     }
 
-    if (!validatePassword(password)) {
+    if (!validatePasswordStrength(password).isValid) {
       throw new Error('Password must be at least 8 characters with uppercase, lowercase, and numbers');
     }
 
