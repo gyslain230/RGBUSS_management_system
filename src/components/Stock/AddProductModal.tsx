@@ -103,7 +103,6 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
       toast.success(`Product added successfully! ${sanitizedData.quantity > 0 ? 'Initial stock recorded as entres.' : ''}`);
       
       logSecurityEvent('product_add_success', { product_name: sanitizedData.name });
-      clearCache('products');
       reset();
       onSuccess();
     } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Package, DollarSign, Users, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Package, DollarSign, Users, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getProducts, getUsers, getCredits } from '../lib/supabase';
 
@@ -118,26 +118,6 @@ export default function Dashboard() {
               <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{stats.lowStockProducts}</p>
             </div>
             <AlertTriangle className="h-8 w-8 lg:h-10 lg:w-10 text-red-600" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Revenue</p>
-              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">${stats.todayRevenue.toFixed(2)}</p>
-            </div>
-            <TrendingUp className="h-8 w-8 lg:h-10 lg:w-10 text-purple-600" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Analytics</p>
-              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">View Reports</p>
-            </div>
-            <BarChart3 className="h-8 w-8 lg:h-10 lg:w-10 text-indigo-600" />
           </div>
         </div>
       </div>

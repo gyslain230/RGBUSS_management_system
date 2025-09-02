@@ -37,7 +37,6 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     try {
       await signUp(data.email, data.password, data.fullName, data.role);
       toast.success('User created successfully!');
-      clearCache('users');
       reset();
       logSecurityEvent('user_add_success', { email: '[redacted]', role: data.role });
       onSuccess();

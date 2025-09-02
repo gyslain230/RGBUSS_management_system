@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Save, Trash2, Package, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Save, Trash2, Package, AlertCircle } from 'lucide-react';
 import { supabase, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { validateInput, logSecurityEvent } from '../utils/security';
@@ -267,7 +267,7 @@ export default function SalesManagement() {
               disabled={!selectedProductId || soldeQuantity === ''}
               className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Package className="h-4 w-4 mr-2" />
               Add Entry
             </button>
           </div>

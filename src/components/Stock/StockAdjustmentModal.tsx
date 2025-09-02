@@ -133,9 +133,6 @@ export default function StockAdjustmentModal({
         quantity: adjustmentQuantity 
       });
       
-      clearCache("products");
-      clearCache("stock_adjustments_all");
-      clearCache(`stock_adjustments_${product.id}`);
       reset();
       onSuccess();
       onClose();

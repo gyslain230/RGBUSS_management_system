@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, RefreshCw, Info, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
+import { FileText, Download, Calendar, RefreshCw, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, DailyReportStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
 import { format, subDays } from 'date-fns';

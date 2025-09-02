@@ -15,17 +15,6 @@ import DailyReports from './pages/DailyReports';
 import UserManagement from './pages/UserManagement';
 import CreditPanel from './pages/CreditPanel';
 
-// Security: Clear any potentially cached auth data on app start
-const clearAuthCache = () => {
-  try {
-    // Only clear cache, not auth tokens unless explicitly logging out
-    // This prevents clearing valid sessions on page refresh
-    console.log('Clearing cache only, preserving auth tokens');
-  } catch (error) {
-    console.warn('Failed to clear auth cache:', error);
-  }
-};
-
 // Security: Add global error handler for auth errors
 window.addEventListener('error', (event) => {
   if (event.error?.message?.includes('auth') || 

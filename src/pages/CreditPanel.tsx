@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Search, AlertTriangle, CheckCircle, Plus, DollarSign } from 'lucide-react';
-import { getCredits, clearCache, supabase, Credit } from '../lib/supabase';
+import { getCredits, supabase, Credit } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';

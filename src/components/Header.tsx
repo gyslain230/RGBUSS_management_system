@@ -93,11 +93,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             <ThemeToggle />
 
-            <button className="hidden sm:block p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 relative transition-colors">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white dark:ring-gray-800"></span>
-            </button>
-            
             <div className="flex items-center space-x-3 lg:space-x-4">
               <div className="flex-shrink-0">
                 <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">

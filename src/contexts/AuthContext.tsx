@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, getCurrentUser, clearCache } from '../lib/supabase';
-import { clearAllStorage, isSessionValid, loginRateLimiter, sanitizeInput, isValidEmail, validatePasswordStrength, logSecurityEvent, sanitizeErrorMessage } from '../utils/security';
+import { signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, getCurrentUser } from '../lib/supabase';
+import { clearAllStorage, loginRateLimiter, sanitizeInput, isValidEmail, validatePasswordStrength, logSecurityEvent, sanitizeErrorMessage } from '../utils/security';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -39,8 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0);
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
-  const [initialAuthCheck, setInitialAuthCheck] = useState(false);
-  const [authStateLoaded, setAuthStateLoaded] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Track if session warning has been shown to prevent spam
@@ -192,14 +190,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Security: Re-check auth state periodically for logged-in users
   useEffect(() => {
-    if (user && authStateLoaded) {
+    if (user) {
       const interval = setInterval(() => {
         checkAuthState();
       }, 5 * 60 * 1000); // Check every 5 minutes
 
       return () => clearInterval(interval);
     }
-  }, [user, authStateLoaded]);
 
   // Security: Enhanced sign in with comprehensive validation
   const signIn = async (email: string, password: string) => {
@@ -276,9 +273,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userProfile);
       setSessionTimeRemaining(60 * 60 * 1000); // 1 hour
       setSessionChecked(true); // Mark session as checked
-      
-      // Clear the initial auth check flag
-      setInitialAuthCheck(true);
       
       // Return success to indicate login completed
       return { success: true, user: userProfile };
@@ -399,7 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    loading: loading || !initialAuthCheck || isInitializing,
+    loading: loading || isInitializing,
     sessionChecked,
     sessionTimeRemaining,
     signIn,

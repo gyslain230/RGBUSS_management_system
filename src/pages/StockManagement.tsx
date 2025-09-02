@@ -266,7 +266,6 @@ export default function StockManagement() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
-            clearCache('products');
             fetchProducts();
           }}
         />
@@ -284,7 +283,6 @@ export default function StockManagement() {
           onSuccess={() => {
             setShowAdjustmentModal(false);
             setSelectedProduct(null);
-            clearCache('products');
             fetchProducts();
           }}
         />
