@@ -166,6 +166,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Security: Enhanced sign in with comprehensive validation
   const signIn = async (email: string, password: string) => {
+    console.log('SignIn attempt started for:', email);
+    
     // Security: Input validation
     if (!email?.trim() || !password) {
       throw new Error('Email and password are required');
@@ -186,12 +188,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true);
+      console.log('Starting authentication process...');
       
       // Security: Clear any existing data before sign in
       clearCache();
-      clearAllStorage();
+      // Don't clear all storage during login - only clear auth-specific items
+      const authKeys = Object.keys(localStorage).filter(key => 
+        key.includes('supabase') || key.includes('auth') || key.includes('session')
+      );
+      authKeys.forEach(key => localStorage.removeItem(key));
       
       const { data } = await signInWithEmail(normalizedEmail, password);
+      console.log('Authentication response received:', !!data.user);
       
       if (!data.user || !data.session) {
         throw new Error('Authentication failed - invalid response');
@@ -202,8 +210,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Invalid session received');
       }
 
+      console.log('Getting user profile...');
       // Security: Get fresh user profile
       const userProfile = await getCurrentUser();
+      console.log('User profile received:', !!userProfile);
       
       if (!userProfile) {
         throw new Error('Failed to load user profile');
@@ -214,21 +224,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Invalid user profile data');
       }
 
+      console.log('Setting user state and session...');
       setUser(userProfile);
       setSessionTimeRemaining(60 * 60 * 1000); // 1 hour
       setSessionChecked(true); // Mark session as checked
       
-      toast.success(`Welcome back, ${userProfile.full_name}!`);
+      console.log('Login successful for user:', userProfile.full_name);
       
       // Return success to indicate login completed
       return { success: true, user: userProfile };
     } catch (error: any) {
+      console.error('SignIn error:', error);
       // Security: Clear everything on sign in failure
       setUser(null);
       setSessionTimeRemaining(0);
       setSessionChecked(true); // Mark as checked even on failure
       clearCache();
-      clearAllStorage();
       
       // Security: Sanitized error messages
       const userFriendlyMessage = error.message?.includes('Invalid login credentials') 

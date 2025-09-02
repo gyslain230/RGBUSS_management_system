@@ -162,6 +162,7 @@ export interface DailyReportStorage {
 
 export const getCurrentUser = async (): Promise<User | null> => {
   if (!isSupabaseConfigured) {
+    console.log('Supabase not configured, returning null user');
     return null;
   }
 
@@ -169,6 +170,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
   const cacheKey = 'current_user';
   
   try {
+    console.log('Getting current user...');
     return await getCachedData(cacheKey, async () => {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Request timeout')), 5000); // Reduced timeout
@@ -176,8 +178,10 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
       const userPromise = supabase.auth.getUser();
       const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
+      console.log('Supabase getUser response:', { hasUser: !!user, hasError: !!userError });
       
       if (userError || !user) {
+        console.log('No user found or error:', userError?.message);
         return null;
       }
 
@@ -188,9 +192,11 @@ export const getCurrentUser = async (): Promise<User | null> => {
         .single();
 
       const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
+      console.log('Profile query response:', { hasProfile: !!profile, hasError: !!profileError, errorCode: profileError?.code });
 
       if (profileError) {
         if (profileError.code === 'PGRST116') {
+          console.log('Profile not found, creating new profile...');
           const { data: newProfile } = await supabase
             .from('profiles')
             .insert([{
@@ -201,14 +207,18 @@ export const getCurrentUser = async (): Promise<User | null> => {
             }])
             .select()
             .single();
+          console.log('New profile created:', !!newProfile);
           return newProfile;
         }
+        console.error('Profile error:', profileError);
         return null;
       }
 
+      console.log('Returning existing profile:', profile?.email);
       return profile;
     });
   } catch (error: any) {
+    console.error('getCurrentUser error:', error);
     clearCache(cacheKey);
     return null;
   }
@@ -302,6 +312,8 @@ export const signInWithEmail = async (email: string, password: string) => {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
+  console.log('Supabase signIn attempt for:', email);
+
   // Input validation
   if (!email || !password) {
     throw new Error('Email and password are required');
@@ -325,7 +337,9 @@ export const signInWithEmail = async (email: string, password: string) => {
       password,
     });
 
+    console.log('Calling Supabase auth.signInWithPassword...');
     const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
+    console.log('Supabase auth response:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user, hasSession: !!data?.session });
 
     if (error) {
       // Log security-relevant errors
@@ -365,6 +379,7 @@ export const signInWithEmail = async (email: string, password: string) => {
       throw new Error('Session expired immediately after creation');
     }
 
+    console.log('Supabase signIn successful');
     return data;
   } catch (error: any) {
     if (error.message?.includes('timeout')) {

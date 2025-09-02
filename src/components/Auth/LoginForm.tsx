@@ -27,18 +27,24 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Clear any previous error states
+    setSubmitting(true);
+
     if (!email || !password) {
       toast.error("Please fill in all fields");
+      setSubmitting(false);
       return;
     }
 
     if (!email.includes("@")) {
       toast.error("Please enter a valid email address");
+      setSubmitting(false);
       return;
     }
 
     if (password.length < 6) {
       toast.error("Password must be at least 6 characters long");
+      setSubmitting(false);
       return;
     }
 
@@ -46,16 +52,24 @@ export default function LoginForm() {
       toast.error(
         "Authentication service not configured. Please set up Supabase."
       );
+      setSubmitting(false);
       return;
     }
 
-    setSubmitting(true);
     try {
-      await signIn(email.trim(), password);
+      const result = await signIn(email.trim(), password);
       
-      // Navigate immediately after successful sign in
-      navigate(from, { replace: true });
+      // Only navigate if sign in was successful
+      if (result && result.success) {
+        toast.success('Login successful! Redirecting...');
+        // Small delay to show success message
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 500);
+      }
     } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Login failed');
       // Clear password field on error for security
       setPassword('');
     } finally {
