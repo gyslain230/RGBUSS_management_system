@@ -69,8 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       await checkAuthState();
     } finally {
-      setInitialAuthCheck(true);
-      setAuthStateLoaded(true);
+      setSessionChecked(true);
       setIsInitializing(false);
       setLoading(false);
     }
