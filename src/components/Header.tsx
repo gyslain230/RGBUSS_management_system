@@ -92,25 +92,33 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             <ThemeToggle />
 
-            <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4 min-w-0">
-              <div className="flex-shrink-0">
-                <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <span className="text-sm lg:text-base font-medium text-blue-800 dark:text-blue-200">
-                    {user?.full_name?.charAt(0).toUpperCase()}
-                  </span>
+            {/* User Profile Section */}
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              {/* Avatar */}
+              <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm lg:text-base font-medium text-blue-800 dark:text-blue-200">
+                  {user?.full_name?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              
+              {/* User Info - Hidden on mobile */}
+              <div className="hidden sm:block min-w-0">
+                <div className="text-sm lg:text-base font-medium text-gray-900 dark:text-white truncate">
+                  {user?.full_name}
+                </div>
+                <div className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                  <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
+                  <span className="truncate max-w-32 lg:max-w-none">{user?.email}</span>
                 </div>
               </div>
-              <div className="hidden sm:block min-w-0 flex-1">
-                <div className="text-sm lg:text-base font-medium text-gray-900 dark:text-white">{user?.full_name}</div>
-                <div className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 flex items-center truncate max-w-24 sm:max-w-32 lg:max-w-none">
-                  <Mail className="h-3 w-3 mr-1" />
-                  <span className="truncate">{user?.email}</span>
-                </div>
-              </div>
+            </div>
+
+            {/* Sign Out Button */}
+            <div className="flex items-center">
               <button
                 onClick={handleSignOut}
                 disabled={loading}
-                className="flex-shrink-0 p-2 lg:p-3 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors disabled:opacity-50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-2 lg:p-3 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors disabled:opacity-50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"
                 title="Sign out"
               >
                 <LogOut className="h-5 w-5 lg:h-6 lg:w-6" />
