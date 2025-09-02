@@ -469,8 +469,6 @@ export const initializeSecurity = (): void => {
     });
   }
 };
-
-// Security: Audit logging helper
 export const logSecurityEvent = (event: string, details?: any): void => {
   // In production, this would send to a secure logging service
   if (import.meta.env.DEV) {

@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { sanitizeInput, sanitizeErrorMessage, validateInput, logSecurityEvent, validatePasswordStrength } from '../utils/security';
 import { sanitizeInput, sanitizeErrorMessage, validateInput, logSecurityEvent } from '../utils/security';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
