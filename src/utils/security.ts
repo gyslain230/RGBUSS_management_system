@@ -264,6 +264,7 @@ class EnhancedRateLimiter {
     const elapsed = Date.now() - record.lastAttempt;
     const timeWindow = record.blocked ? this.blockDuration : this.windowMs;
     return Math.max(0, timeWindow - elapsed);
+  }
 }
 
 export const loginRateLimiter = new EnhancedRateLimiter();
