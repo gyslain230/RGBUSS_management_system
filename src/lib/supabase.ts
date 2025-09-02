@@ -170,7 +170,6 @@ export const getCurrentUser = async (): Promise<User | null> => {
   const cacheKey = 'current_user';
   
   try {
-    console.log('Getting current user...');
     return await getCachedData(cacheKey, async () => {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Request timeout')), 5000); // Reduced timeout
@@ -178,10 +177,8 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
       const userPromise = supabase.auth.getUser();
       const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
-      console.log('Supabase getUser response:', { hasUser: !!user, hasError: !!userError });
       
       if (userError || !user) {
-        console.log('No user found or error:', userError?.message);
         return null;
       }
 
@@ -192,11 +189,9 @@ export const getCurrentUser = async (): Promise<User | null> => {
         .single();
 
       const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
-      console.log('Profile query response:', { hasProfile: !!profile, hasError: !!profileError, errorCode: profileError?.code });
 
       if (profileError) {
         if (profileError.code === 'PGRST116') {
-          console.log('Profile not found, creating new profile...');
           const { data: newProfile } = await supabase
             .from('profiles')
             .insert([{
@@ -207,18 +202,14 @@ export const getCurrentUser = async (): Promise<User | null> => {
             }])
             .select()
             .single();
-          console.log('New profile created:', !!newProfile);
           return newProfile;
         }
-        console.error('Profile error:', profileError);
         return null;
       }
 
-      console.log('Returning existing profile:', profile?.email);
       return profile;
     });
   } catch (error: any) {
-    console.error('getCurrentUser error:', error);
     clearCache(cacheKey);
     return null;
   }
@@ -326,7 +317,6 @@ export const signInWithEmail = async (email: string, password: string) => {
   }
 
   try {
-    console.log('Attempting sign in for:', email);
     
     const response = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
@@ -340,10 +330,8 @@ export const signInWithEmail = async (email: string, password: string) => {
 
     const { data, error } = response;
 
-    console.log('Sign in response:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user });
 
     if (error) {
-      console.error('Authentication error:', error);
       if (error.message?.includes('Invalid login credentials')) {
         throw new Error('Invalid email or password');
       } else if (error.message?.includes('Email not confirmed')) {
@@ -373,7 +361,6 @@ export const signInWithEmail = async (email: string, password: string) => {
       throw new Error('Invalid user data structure received');
     }
 
-    console.log('Authentication successful for:', data.user.email);
     return data;
     
   } catch (error: any) {

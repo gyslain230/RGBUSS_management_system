@@ -194,8 +194,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         authResponse = await signInWithEmail(normalizedEmail, password);
       } catch (authError) {
-        // Log the actual authentication error for debugging
-        console.error('Authentication service error:', authError);
         throw authError;
       }
       
@@ -218,7 +216,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Session validation failed');
         }
       } catch (sessionError) {
-        console.error('Session validation error:', sessionError);
         throw new Error('Session validation failed');
       }
 
@@ -227,7 +224,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         userProfile = await getCurrentUser();
       } catch (profileError) {
-        console.error('Profile fetch error:', profileError);
         throw new Error('Failed to load user profile after authentication');
       }
       
@@ -252,9 +248,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionTimeRemaining(0);
       setSessionChecked(true); // Mark as checked even on failure
       clearCache();
-      
-      // Log the full error for debugging
-      console.error('SignIn function error:', error);
       
       throw error;
     } finally {
