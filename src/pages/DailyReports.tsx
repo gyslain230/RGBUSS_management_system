@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, RefreshCw, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, DailyReportStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
+import { supabase, DailyReportStorage, generateDailyReport, getDailyReportForDate } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';

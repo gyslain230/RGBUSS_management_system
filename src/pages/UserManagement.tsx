@@ -219,7 +219,6 @@ const UserManagement = () => {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
-            clearCache('users');
             fetchUsers();
           }}
         />
