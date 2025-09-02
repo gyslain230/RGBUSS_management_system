@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import AuthGuard from './components/AuthGuard';
+import SessionManager from './components/SessionManager';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import Layout from './components/Layout';
@@ -12,7 +14,6 @@ import SalesManagement from './pages/SalesManagement';
 import DailyReports from './pages/DailyReports';
 import UserManagement from './pages/UserManagement';
 import CreditPanel from './pages/CreditPanel';
-import ProtectedRoute from './components/ProtectedRoute';
 
 // Security: Clear any potentially cached auth data on app start
 const clearAuthCache = () => {
@@ -88,59 +89,95 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
+          <SessionManager />
           <Toaster position="top-right" />
             <Routes>
-              <Route path="/login" element={<LoginForm />} />
-              <Route path="/register" element={<RegisterForm />} />
+              {/* Public routes - redirect to dashboard if already logged in */}
+              <Route 
+                path="/login" 
+                element={
+                  <AuthGuard requireAuth={false} redirectTo="/dashboard">
+                    <LoginForm />
+                  </AuthGuard>
+                } 
+              />
+              <Route 
+                path="/register" 
+                element={
+                  <AuthGuard requireAuth={false} redirectTo="/dashboard">
+                    <RegisterForm />
+                  </AuthGuard>
+                } 
+              />
               
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              {/* Protected routes */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <AuthGuard requireAuth={true} allowedRoles={['admin', 'manager']}>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
+                  </AuthGuard>
+                } 
+              />
               
-              <Route path="/stock" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <StockManagement />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              <Route 
+                path="/stock" 
+                element={
+                  <AuthGuard requireAuth={true} allowedRoles={['admin', 'manager', 'worker']}>
+                    <Layout>
+                      <StockManagement />
+                    </Layout>
+                  </AuthGuard>
+                } 
+              />
               
-              <Route path="/sales" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <SalesManagement />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              <Route 
+                path="/sales" 
+                element={
+                  <AuthGuard requireAuth={true} allowedRoles={['admin', 'manager', 'worker']}>
+                    <Layout>
+                      <SalesManagement />
+                    </Layout>
+                  </AuthGuard>
+                } 
+              />
               
-              <Route path="/reports" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <DailyReports />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              <Route 
+                path="/reports" 
+                element={
+                  <AuthGuard requireAuth={true} allowedRoles={['admin', 'manager', 'worker']}>
+                    <Layout>
+                      <DailyReports />
+                    </Layout>
+                  </AuthGuard>
+                } 
+              />
               
-              <Route path="/users" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <UserManagement />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              <Route 
+                path="/users" 
+                element={
+                  <AuthGuard requireAuth={true} allowedRoles={['admin']}>
+                    <Layout>
+                      <UserManagement />
+                    </Layout>
+                  </AuthGuard>
+                } 
+              />
               
-              <Route path="/credits" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <CreditPanel />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              <Route 
+                path="/credits" 
+                element={
+                  <AuthGuard requireAuth={true} allowedRoles={['admin', 'manager', 'worker']}>
+                    <Layout>
+                      <CreditPanel />
+                    </Layout>
+                  </AuthGuard>
+                } 
+              />
               
+              {/* Default redirect */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

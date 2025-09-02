@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0);
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
+  const [initialAuthCheck, setInitialAuthCheck] = useState(false);
 
   // Track if session warning has been shown to prevent spam
   const [sessionWarningShown, setSessionWarningShown] = useState(false);
@@ -58,8 +59,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Security: Always clear cache and check auth state
     clearCache();
     clearAllStorage();
-    checkAuthState();
+    performInitialAuthCheck();
   }, []);
+
+  // Security: Initial authentication check
+  const performInitialAuthCheck = async () => {
+    try {
+      setLoading(true);
+      await checkAuthState();
+    } finally {
+      setInitialAuthCheck(true);
+      setLoading(false);
+    }
+  };
 
   // Security: Session timeout management
   useEffect(() => {
@@ -133,9 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Security: Enhanced auth state checking
   const checkAuthState = async () => {
-    try {
-      setLoading(true);
-      
+    try {      
       const currentUser = await getCurrentUser();
       
       if (currentUser) {
@@ -160,7 +170,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await performCompleteLogout();
     } finally {
       setSessionChecked(true);
-      setLoading(false);
     }
   };
 
@@ -239,6 +248,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userProfile);
       setSessionTimeRemaining(60 * 60 * 1000); // 1 hour
       setSessionChecked(true); // Mark session as checked
+      
+      // Clear the initial auth check flag
+      setInitialAuthCheck(true);
       
       // Return success to indicate login completed
       return { success: true, user: userProfile };
@@ -359,7 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    loading,
+    loading: loading || !initialAuthCheck,
     sessionChecked,
     sessionTimeRemaining,
     signIn,
