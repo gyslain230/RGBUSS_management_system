@@ -57,16 +57,28 @@ export default function LoginForm() {
     }
 
     try {
-      const result = await signIn(email.trim(), password);
+      let result;
+      try {
+        result = await signIn(email.trim(), password);
+      } catch (signInError) {
+        console.error('SignIn call failed:', signInError);
+        throw signInError;
+      }
       
       // Only navigate if sign in was successful
-      if (result?.success) {
+      if (result && result.success) {
         toast.success('Login successful! Redirecting...');
         navigate(from, { replace: true });
+      } else {
+        throw new Error('Authentication completed but success flag not set');
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error?.message || 'Login failed');
+      
+      // Show user-friendly error message
+      const errorMessage = error?.message || 'Sign in failed. Please try again.';
+      toast.error(errorMessage);
+      
       // Clear password field on error for security
       setPassword('');
     } finally {

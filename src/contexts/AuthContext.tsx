@@ -190,27 +190,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Security: Clear any existing data before sign in
       clearCache();
       
-      const { data } = await signInWithEmail(normalizedEmail, password);
+      let authResponse;
+      try {
+        authResponse = await signInWithEmail(normalizedEmail, password);
+      } catch (authError) {
+        // Log the actual authentication error for debugging
+        console.error('Authentication service error:', authError);
+        throw authError;
+      }
       
-      if (!data || !data.user || !data.session) {
-        throw new Error('Authentication failed - invalid response');
+      // Validate authentication response
+      if (!authResponse) {
+        throw new Error('No response from authentication service');
+      }
+
+      if (!authResponse.user) {
+        throw new Error('Authentication succeeded but no user data received');
+      }
+
+      if (!authResponse.session) {
+        throw new Error('Authentication succeeded but no session created');
       }
 
       // Security: Validate session integrity
-      if (!isSessionValid(data.session)) {
-        throw new Error('Invalid session received');
+      try {
+        if (!isSessionValid(authResponse.session)) {
+          throw new Error('Session validation failed');
+        }
+      } catch (sessionError) {
+        console.error('Session validation error:', sessionError);
+        throw new Error('Session validation failed');
       }
 
       // Security: Get fresh user profile
-      const userProfile = await getCurrentUser();
+      let userProfile;
+      try {
+        userProfile = await getCurrentUser();
+      } catch (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw new Error('Failed to load user profile after authentication');
+      }
       
       if (!userProfile) {
-        throw new Error('Failed to load user profile');
+        throw new Error('User profile not found after successful authentication');
       }
 
       // Security: Validate user profile integrity
       if (!userProfile.id || !userProfile.email || !userProfile.role) {
-        throw new Error('Invalid user profile data');
+        throw new Error('User profile is missing required information');
       }
 
       setUser(userProfile);
@@ -225,6 +252,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionTimeRemaining(0);
       setSessionChecked(true); // Mark as checked even on failure
       clearCache();
+      
+      // Log the full error for debugging
+      console.error('SignIn function error:', error);
       
       throw error;
     } finally {
