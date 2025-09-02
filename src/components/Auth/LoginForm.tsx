@@ -60,16 +60,13 @@ export default function LoginForm() {
       const result = await signIn(email.trim(), password);
       
       // Only navigate if sign in was successful
-      if (result && result.success) {
+      if (result?.success) {
         toast.success('Login successful! Redirecting...');
-        // Small delay to show success message
-        setTimeout(() => {
-          navigate(from, { replace: true });
-        }, 500);
+        navigate(from, { replace: true });
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.message || 'Login failed');
+      toast.error(error?.message || 'Login failed');
       // Clear password field on error for security
       setPassword('');
     } finally {

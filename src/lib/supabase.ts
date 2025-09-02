@@ -312,8 +312,6 @@ export const signInWithEmail = async (email: string, password: string) => {
     throw new Error('Supabase not configured. Please set up your Supabase project.');
   }
 
-  console.log('Supabase signIn attempt for:', email);
-
   // Input validation
   if (!email || !password) {
     throw new Error('Email and password are required');
@@ -328,64 +326,42 @@ export const signInWithEmail = async (email: string, password: string) => {
   }
 
   try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Sign in request timeout')), 15000);
-    });
-
-    const signInPromise = supabase.auth.signInWithPassword({
+    console.log('Attempting sign in for:', email);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
 
-    console.log('Calling Supabase auth.signInWithPassword...');
-    const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
-    console.log('Supabase auth response:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user, hasSession: !!data?.session });
+    console.log('Sign in response:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user });
 
     if (error) {
-      // Log security-relevant errors
-      console.error('Sign in error:', error.message);
-      
-      if (error.message?.includes('Failed to fetch') || 
-          error.message?.includes('fetch') ||
-          error.message?.includes('network')) {
-        throw new Error('Unable to connect to authentication service. Please check your internet connection.');
-      }
+      console.error('Authentication error:', error);
       
       if (error.message?.includes('Invalid login credentials')) {
-        throw new Error('Invalid email or password. Please check your credentials.');
+        throw new Error('Invalid email or password');
+      } else if (error.message?.includes('Email not confirmed')) {
+        throw new Error('Please verify your email address');
+      } else if (error.message?.includes('Too many requests')) {
+        throw new Error('Too many login attempts. Please wait.');
+      } else {
+        throw new Error(error.message || 'Authentication failed');
       }
-      
-      if (error.message?.includes('Email not confirmed')) {
-        throw new Error('Please verify your email address before signing in.');
-      }
-      
-      if (error.message?.includes('Too many requests')) {
-        throw new Error('Too many login attempts. Please wait before trying again.');
-      }
-      
-      throw error;
     }
 
     if (!data.user) {
-      throw new Error('Authentication failed - no user data returned');
+      throw new Error('No user data returned');
     }
 
     if (!data.session) {
-      throw new Error('Authentication failed - no session created');
+      throw new Error('No session created');
     }
 
-    // Validate session expiry
-    if (data.session.expires_at && data.session.expires_at * 1000 < Date.now()) {
-      throw new Error('Session expired immediately after creation');
-    }
-
-    console.log('Supabase signIn successful');
+    console.log('Authentication successful for:', data.user.email);
     return data;
-  } catch (error: any) {
-    if (error.message?.includes('timeout')) {
-      throw new Error('Sign in request timed out. Please check your internet connection and try again.');
-    }
     
+  } catch (error: any) {
+    console.error('Sign in error:', error);
     throw error;
   }
 };
