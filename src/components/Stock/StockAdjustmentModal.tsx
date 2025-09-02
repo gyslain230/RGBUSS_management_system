@@ -112,7 +112,7 @@ export default function StockAdjustmentModal({
             quantity_adjusted: adjustmentQuantity,
             previous_quantity: previousQuantity,
             new_quantity: newQuantity,
-            reason: data.reason.trim().substring(0, 200), // Security: Limit reason length
+            reason: sanitizeInput(data.reason.trim(), 200),
             adjusted_by: user.id,
             adjusted_by_name: user.full_name,
           },
@@ -126,6 +126,12 @@ export default function StockAdjustmentModal({
         } successfully! ${previousQuantity} → ${newQuantity}`
       );
 
+      logSecurityEvent('stock_adjustment_success', { 
+        product_id: product.id, 
+        adjustment_type: data.adjustment_type,
+        quantity: adjustmentQuantity 
+      });
+      
       clearCache("products");
       clearCache("stock_adjustments_all");
       clearCache(`stock_adjustments_${product.id}`);
@@ -133,7 +139,7 @@ export default function StockAdjustmentModal({
       onSuccess();
       onClose();
     } catch (error) {
-      // Security: Don't expose internal errors
+      logSecurityEvent('stock_adjustment_failure');
       toast.error('Failed to adjust stock. Please try again.');
     } finally {
       setLoading(false);

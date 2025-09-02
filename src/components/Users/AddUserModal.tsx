@@ -3,6 +3,7 @@ import { X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { clearCache } from '../../lib/supabase';
+import { sanitizeInput, validateInput, logSecurityEvent, sanitizeErrorMessage } from '../../utils/security';
 import toast from 'react-hot-toast';
 
 interface AddUserModalProps {
@@ -38,9 +39,11 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
       toast.success('User created successfully!');
       clearCache('users');
       reset();
+      logSecurityEvent('user_add_success', { email: '[redacted]', role: data.role });
       onSuccess();
       onClose();
     } catch (error: any) {
+      logSecurityEvent('user_add_failure');
       const errorMessage = error.message || 'Failed to create user';
       setError(errorMessage);
       toast.error(errorMessage);

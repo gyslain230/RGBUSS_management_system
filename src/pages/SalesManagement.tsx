@@ -126,6 +126,13 @@ export default function SalesManagement() {
         const currentQuantity = entry.product.quantity;
         const newSoldeQuantity = entry.soldeQuantity;
         
+        // Validate quantities
+        const quantityValidation = validateInput.quantity(newSoldeQuantity);
+        if (!quantityValidation.isValid) {
+          logSecurityEvent('sales_invalid_quantity', { product_id: entry.product.id });
+          throw new Error(`Invalid quantity for ${entry.product.name}: ${quantityValidation.error}`);
+        }
+        
         const difference = newSoldeQuantity - currentQuantity;
         
         if (difference !== 0) {
@@ -167,10 +174,12 @@ export default function SalesManagement() {
 
       toast.success(`Successfully updated solde for ${soldeEntries.length} products`);
       
+      logSecurityEvent('sales_submit_success', { entries_count: soldeEntries.length });
       setSoldeEntries([]);
       await fetchProducts();
       
     } catch (error) {
+      logSecurityEvent('sales_submit_failure');
       toast.error('Error updating solde entries');
     } finally {
       setSubmitting(false);

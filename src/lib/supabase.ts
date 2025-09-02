@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sanitizeInput, sanitizeErrorMessage, validateInput, validateUserData, logSecurityEvent } from '../utils/security';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -300,32 +301,40 @@ export const getStockAdjustments = async (productId?: string) => {
 
 export const signInWithEmail = async (email: string, password: string) => {
   if (!isSupabaseConfigured) {
-    throw new Error('Supabase not configured. Please set up your Supabase project.');
+    const error = new Error('Authentication service not available');
+    logSecurityEvent('auth_service_unavailable');
+    throw error;
   }
 
-  // Input validation
-  if (!email || !password) {
+  // Enhanced input validation
+  if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+    logSecurityEvent('auth_invalid_input', { email: email ? '[provided]' : '[missing]' });
     throw new Error('Email and password are required');
   }
 
-  if (!email.includes('@') || email.length < 5) {
+  // Sanitize and validate email
+  const sanitizedEmail = sanitizeInput(email.trim().toLowerCase(), 254);
+  if (!sanitizedEmail || sanitizedEmail.length < 5 || !sanitizedEmail.includes('@')) {
+    logSecurityEvent('auth_invalid_email_format');
     throw new Error('Please enter a valid email address');
   }
 
   if (password.length < 6) {
+    logSecurityEvent('auth_weak_password');
     throw new Error('Password must be at least 6 characters long');
   }
 
   try {
     
     const response = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: sanitizedEmail,
       password,
     });
 
-    // Check if response exists
+    // Enhanced response validation
     if (!response) {
-      throw new Error('No response from authentication service');
+      logSecurityEvent('auth_no_response');
+      throw new Error('Authentication service error');
     }
 
     const { data, error } = response;
@@ -345,22 +354,27 @@ export const signInWithEmail = async (email: string, password: string) => {
 
     // Validate response data structure
     if (!data || typeof data !== 'object') {
+      logSecurityEvent('auth_invalid_response_format');
       throw new Error('Invalid authentication response format');
     }
 
     if (!data.user) {
+      logSecurityEvent('auth_no_user_data');
       throw new Error('Authentication successful but no user data received');
     }
 
     if (!data.session) {
+      logSecurityEvent('auth_no_session');
       throw new Error('Authentication successful but no session created');
     }
 
     // Validate user object structure
     if (!data.user.id || !data.user.email) {
+      logSecurityEvent('auth_invalid_user_structure');
       throw new Error('Invalid user data structure received');
     }
 
+    logSecurityEvent('auth_success', { user_id: data.user.id });
     return data;
     
   } catch (error: any) {
@@ -378,28 +392,43 @@ export const signInWithEmail = async (email: string, password: string) => {
 
 export const signUpWithEmail = async (email: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
   if (!isSupabaseConfigured) {
-    throw new Error('Supabase not configured. Please set up your Supabase project.');
+    logSecurityEvent('signup_service_unavailable');
+    throw new Error('Registration service not available');
   }
 
-  // Input validation
-  if (!email || !password || !fullName) {
+  // Enhanced input validation with sanitization
+  if (!email || !password || !fullName || 
+      typeof email !== 'string' || typeof password !== 'string' || typeof fullName !== 'string') {
+    logSecurityEvent('signup_missing_fields');
     throw new Error('All fields are required');
   }
 
-  if (!email.includes('@') || email.length < 5) {
+  // Validate and sanitize inputs
+  const sanitizedEmail = sanitizeInput(email.trim().toLowerCase(), 254);
+  const sanitizedFullName = sanitizeInput(fullName.trim(), 100);
+  
+  const emailValidation = validateInput.name(sanitizedEmail);
+  if (!emailValidation.isValid || !sanitizedEmail.includes('@')) {
+    logSecurityEvent('signup_invalid_email');
     throw new Error('Please enter a valid email address');
   }
 
-  if (password.length < 6) {
-    throw new Error('Password must be at least 6 characters long');
+  const passwordValidation = validatePasswordStrength(password);
+  if (!passwordValidation.isValid) {
+    logSecurityEvent('signup_weak_password');
+    throw new Error(passwordValidation.errors[0] || 'Password does not meet requirements');
   }
 
-  if (fullName.trim().length < 2) {
-    throw new Error('Full name must be at least 2 characters long');
+  const nameValidation = validateInput.name(sanitizedFullName);
+  if (!nameValidation.isValid) {
+    logSecurityEvent('signup_invalid_name');
+    throw new Error(nameValidation.error || 'Invalid full name');
   }
 
-  if (!['admin', 'manager', 'worker'].includes(role)) {
-    throw new Error('Invalid role specified');
+  const roleValidation = validateInput.role(role);
+  if (!roleValidation.isValid) {
+    logSecurityEvent('signup_invalid_role');
+    throw new Error(roleValidation.error || 'Invalid role specified');
   }
 
   try {
@@ -408,11 +437,11 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     });
 
     const signUpPromise = supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+      email: sanitizedEmail,
       password,
       options: {
         data: {
-          full_name: fullName.trim(),
+          full_name: sanitizedFullName,
           role: role
         }
       }
@@ -540,14 +569,14 @@ export const signOut = async () => {
     const { error } = await Promise.race([signOutPromise, timeoutPromise]);
     
     if (error) {
-      console.error('Sign out error:', error.message);
+      logSecurityEvent('signout_error');
       throw error;
     }
     
     // Clear any cached data
     clearCache();
   } catch (error: any) {
-    console.error('Sign out failed:', error.message);
+    logSecurityEvent('signout_failure');
     // Clear cache even if sign out fails
     clearCache();
     throw error;

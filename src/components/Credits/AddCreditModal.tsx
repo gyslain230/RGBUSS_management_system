@@ -116,13 +116,17 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
       if (error) throw error;
 
       toast.success('Credit added successfully!');
+      logSecurityEvent('credit_add_success', { 
+        customer_name: sanitizedData.customer_name,
+        amount: sanitizedData.amount 
+      });
       clearCache('credits_all');
       clearCache(`credits_${user?.id}`);
       reset();
       setSelectedProduct(null);
       onSuccess();
     } catch (error) {
-      // Security: Don't expose internal errors
+      logSecurityEvent('credit_add_failure');
       toast.error('Failed to add credit. Please try again.');
     } finally {
       setLoading(false);

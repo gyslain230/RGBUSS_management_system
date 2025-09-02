@@ -27,28 +27,34 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Clear any previous error states
+    // Security: Enhanced input validation
     setSubmitting(true);
 
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      logSecurityEvent('login_missing_credentials');
       toast.error("Please fill in all fields");
       setSubmitting(false);
       return;
     }
 
-    if (!email.includes("@")) {
+    // Sanitize and validate email
+    const sanitizedEmail = sanitizeInput(email.trim().toLowerCase(), 254);
+    if (!isValidEmail(sanitizedEmail)) {
+      logSecurityEvent('login_invalid_email_format');
       toast.error("Please enter a valid email address");
       setSubmitting(false);
       return;
     }
 
     if (password.length < 6) {
+      logSecurityEvent('login_short_password');
       toast.error("Password must be at least 6 characters long");
       setSubmitting(false);
       return;
     }
 
     if (!isSupabaseReady()) {
+      logSecurityEvent('login_service_unavailable');
       toast.error(
         "Authentication service not configured. Please set up Supabase."
       );
@@ -59,23 +65,23 @@ export default function LoginForm() {
     try {
       let result;
       try {
-        result = await signIn(email.trim(), password);
+        result = await signIn(sanitizedEmail, password);
       } catch (signInError) {
-        console.error('SignIn call failed:', signInError);
         throw signInError;
       }
       
       // Only navigate if sign in was successful
       if (result && result.success) {
+        logSecurityEvent('login_success');
         toast.success('Login successful! Redirecting...');
         navigate(from, { replace: true });
       } else {
+        logSecurityEvent('login_success_flag_missing');
         throw new Error('Authentication completed but success flag not set');
       }
     } catch (error: any) {
-      // Show user-friendly error message
-      const errorMessage = error?.message || 'Sign in failed. Please try again.';
-      toast.error(errorMessage);
+      logSecurityEvent('login_failure', { error: error?.message?.substring(0, 50) });
+      toast.error(error?.message || 'Sign in failed. Please try again.');
       
       // Clear password field on error for security
       setPassword('');

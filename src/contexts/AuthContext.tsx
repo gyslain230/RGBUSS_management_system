@@ -291,16 +291,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       await signUpWithEmail(normalizedEmail, password, sanitizedFullName, role);
       
+      logSecurityEvent('signup_success');
       toast.success('Account created successfully! Please sign in.');
     } catch (error: any) {
-      // Security: Sanitized error messages
-      const userFriendlyMessage = error.message?.includes('User already registered')
-        ? 'An account with this email already exists'
-        : error.message?.includes('network') || error.message?.includes('fetch')
-        ? 'Network error. Please check your connection.'
-        : error.message || 'Failed to create account. Please try again.';
+      logSecurityEvent('signup_failure', { error: error.message?.substring(0, 50) });
       
-      throw new Error(userFriendlyMessage);
+      throw new Error(sanitizeErrorMessage(error.message) || 'Failed to create account');
     } finally {
       setLoading(false);
     }

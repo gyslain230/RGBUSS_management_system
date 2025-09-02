@@ -69,10 +69,6 @@ export default function RegisterForm() {
 
     setLoading(true);
     try {
-      // Sanitize inputs
-      const sanitizedEmail = email.trim().toLowerCase();
-      const sanitizedFullName = fullName.trim().replace(/[<>]/g, ''); // Basic XSS protection
-      
       await signUp(sanitizedEmail, password, sanitizedFullName, role);
       
       // Clear form data for security
@@ -81,8 +77,10 @@ export default function RegisterForm() {
       setConfirmPassword('');
       setFullName('');
       
+      logSecurityEvent('register_success', { email: '[redacted]', role });
       navigate('/login');
     } catch (error) {
+      logSecurityEvent('register_failure');
       // Clear password fields on error for security
       setPassword('');
       setConfirmPassword('');
