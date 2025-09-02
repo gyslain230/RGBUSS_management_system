@@ -51,13 +51,10 @@ export default function LoginForm() {
 
     setSubmitting(true);
     try {
-      // Clear any existing form data
-      const trimmedEmail = email.trim().toLowerCase();
-      
       await signIn(email.trim(), password);
-      setTimeout(() => {
-        navigate(from, { replace: true });
-      }, 3000);
+      
+      // Navigate immediately after successful sign in
+      navigate(from, { replace: true });
     } catch (error: any) {
       // Clear password field on error for security
       setPassword('');

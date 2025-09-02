@@ -216,12 +216,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userProfile);
       setSessionTimeRemaining(60 * 60 * 1000); // 1 hour
+      setSessionChecked(true); // Mark session as checked
       
       toast.success(`Welcome back, ${userProfile.full_name}!`);
+      
+      // Return success to indicate login completed
+      return { success: true, user: userProfile };
     } catch (error: any) {
       // Security: Clear everything on sign in failure
       setUser(null);
       setSessionTimeRemaining(0);
+      setSessionChecked(true); // Mark as checked even on failure
       clearCache();
       clearAllStorage();
       

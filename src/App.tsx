@@ -68,12 +68,6 @@ function App() {
       // Security: Clear URL parameters after processing
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    
-    // Security: Always clear cache on fresh app load
-    const isPageRefresh = performance.navigation?.type === 1;
-    if (isPageRefresh) {
-      clearAuthCache();
-    }
   }, []);
 
   // Security: Add beforeunload handler to clear sensitive data
