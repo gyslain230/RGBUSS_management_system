@@ -212,6 +212,10 @@ export default function SalesManagement() {
           <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-none lg:max-w-7xl lg:mx-auto">
         </div>
       </div>
+          </p>
+        </div>
+        </main>
+      </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 lg:p-8">
         <div className="flex items-center mb-4">
