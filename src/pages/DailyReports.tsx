@@ -66,7 +66,7 @@ export default function DailyReports() {
         .select('solde')
         .eq('product_id', productId)
         .eq('report_date', previousDate)
-        .single();
+        .maybeSingle();
 
       if (storedReport) {
         return storedReport.solde;
