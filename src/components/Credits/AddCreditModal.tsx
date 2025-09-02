@@ -3,6 +3,7 @@ import { X, CreditCard, User, DollarSign, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { supabase, getProducts, clearCache, Product } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { sanitizeInput, logSecurityEvent } from '../../utils/security';
 import toast from 'react-hot-toast';
 
 interface AddCreditModalProps {

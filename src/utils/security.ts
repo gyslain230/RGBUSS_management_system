@@ -264,25 +264,9 @@ class EnhancedRateLimiter {
     const elapsed = Date.now() - record.lastAttempt;
     const timeWindow = record.blocked ? this.blockDuration : this.windowMs;
     return Math.max(0, timeWindow - elapsed);
-  }
-  
-  reset(identifier: string): void {
-    this.attempts.delete(identifier);
-  }
 }
 
 export const loginRateLimiter = new EnhancedRateLimiter();
-
-// Security: Generate cryptographically secure random string
-export const generateSecureToken = (length: number = 32): string => {
-  if (!crypto || !crypto.getRandomValues) {
-    throw new Error('Crypto API not available');
-  }
-  
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-};
 
 // Security: Detect if running in secure context
 export const isSecureContext = (): boolean => {
@@ -425,67 +409,6 @@ export const sanitizeErrorMessage = (error: any): string => {
   return sanitized.length > 100 ? 'An error occurred. Please try again.' : sanitized;
 };
 
-// Security: Enhanced rate limiting with IP tracking and progressive delays
-class EnhancedRateLimiter {
-  private attempts: Map<string, { count: number; lastAttempt: number; blocked: boolean }> = new Map();
-  private readonly maxAttempts = 5;
-  private readonly windowMs = 15 * 60 * 1000; // 15 minutes
-  private readonly blockDuration = 30 * 60 * 1000; // 30 minutes
-
-  isAllowed(identifier: string): boolean {
-    const now = Date.now();
-    const record = this.attempts.get(identifier);
-    
-    if (!record) {
-      this.attempts.set(identifier, { count: 1, lastAttempt: now, blocked: false });
-      return true;
-    }
-    
-    // Check if user is currently blocked
-    if (record.blocked && (now - record.lastAttempt) < this.blockDuration) {
-      return false;
-    }
-    
-    // Reset if window has passed
-    if (now - record.lastAttempt > this.windowMs) {
-      this.attempts.set(identifier, { count: 1, lastAttempt: now, blocked: false });
-      return true;
-    }
-    
-    // Check if under limit
-    if (record.count < this.maxAttempts) {
-      record.count++;
-      record.lastAttempt = now;
-      return true;
-    }
-    
-    // Block user after max attempts
-    record.blocked = true;
-    record.lastAttempt = now;
-    return false;
-  }
-  
-  getRemainingTime(identifier: string): number {
-    const record = this.attempts.get(identifier);
-    if (!record) return 0;
-    
-    const elapsed = Date.now() - record.lastAttempt;
-    const timeWindow = record.blocked ? this.blockDuration : this.windowMs;
-    return Math.max(0, timeWindow - elapsed);
-  }
-  
-  reset(identifier: string): void {
-    this.attempts.delete(identifier);
-  }
-  
-  getAttemptCount(identifier: string): number {
-    const record = this.attempts.get(identifier);
-    return record ? record.count : 0;
-  }
-}
-
-export const loginRateLimiter = new EnhancedRateLimiter();
-
 // Security: Comprehensive security initialization
 export const initializeSecurity = (): void => {
   // Enforce CSP
@@ -546,38 +469,6 @@ export const initializeSecurity = (): void => {
   }
 };
 
-// Security: Data validation helpers
-export const validateUserData = (userData: any): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (!userData || typeof userData !== 'object') {
-    return { isValid: false, errors: ['Invalid user data format'] };
-  }
-  
-  // Validate required fields
-  if (!userData.id || typeof userData.id !== 'string') {
-    errors.push('User ID is required');
-  }
-  
-  if (!userData.email || !isValidEmail(userData.email)) {
-    errors.push('Valid email is required');
-  }
-  
-  if (!userData.full_name || typeof userData.full_name !== 'string' || userData.full_name.trim().length < 2) {
-    errors.push('Valid full name is required');
-  }
-  
-  const roleValidation = validateInput.role(userData.role);
-  if (!roleValidation.isValid) {
-    errors.push(roleValidation.error || 'Invalid role');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-};
-
 // Security: Audit logging helper
 export const logSecurityEvent = (event: string, details?: any): void => {
   // In production, this would send to a secure logging service
@@ -601,50 +492,4 @@ export const logSecurityEvent = (event: string, details?: any): void => {
     
     localStorage.setItem('audit_logs', JSON.stringify(auditLogs));
   }
-};
-
-// Security: Environment validation
-export const validateEnvironment = (): { isSecure: boolean; warnings: string[] } => {
-  const warnings: string[] = [];
-  
-  if (!isSecureContext()) {
-    warnings.push('Application is not running over HTTPS');
-  }
-  
-  if (import.meta.env.DEV) {
-    warnings.push('Application is running in development mode');
-  }
-  
-  // Check for required environment variables
-  const requiredEnvVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
-  requiredEnvVars.forEach(envVar => {
-    if (!import.meta.env[envVar]) {
-      warnings.push(`Missing required environment variable: ${envVar}`);
-    }
-  });
-  
-  return {
-    isSecure: warnings.length === 0,
-    warnings
-  };
-};
-
-// Security: XSS protection for dynamic content
-export const sanitizeHTML = (html: string): string => {
-  const div = document.createElement('div');
-  div.textContent = html;
-  return div.innerHTML;
-};
-
-// Security: SQL injection prevention helpers (for client-side validation)
-export const validateSQLInput = (input: string): boolean => {
-  const sqlPatterns = [
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)/i,
-    /[';--]/,
-    /\/\*.*\*\//,
-    /\bOR\b.*\b=\b/i,
-    /\bAND\b.*\b=\b/i
-  ];
-  
-  return !sqlPatterns.some(pattern => pattern.test(input));
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, RefreshCw, Info, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Product, Sale, StockAdjustment, Credit, DailyReportStorage, getDailyReportsStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
+import { supabase, DailyReportStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -30,7 +30,7 @@ interface DailyReportData {
 export default function DailyReports() {
   const { user } = useAuth();
   const [reportData, setReportData] = useState<DailyReportData[]>([]);
-  const [creditsData, setCreditsData] = useState<Credit[]>([]);
+  const [creditsData, setCreditsData] = useState<any[]>([]);
   const [storedReports, setStoredReports] = useState<DailyReportStorage[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));

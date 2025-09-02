@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { sanitizeInput, sanitizeErrorMessage, validateInput, validateUserData, logSecurityEvent } from '../utils/security';
+import { sanitizeInput, sanitizeErrorMessage, validateInput, logSecurityEvent } from '../utils/security';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;

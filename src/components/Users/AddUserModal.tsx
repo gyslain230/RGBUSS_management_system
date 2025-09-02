@@ -3,7 +3,7 @@ import { X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { clearCache } from '../../lib/supabase';
-import { sanitizeInput, validateInput, logSecurityEvent, sanitizeErrorMessage } from '../../utils/security';
+import { logSecurityEvent } from '../../utils/security';
 import toast from 'react-hot-toast';
 
 interface AddUserModalProps {

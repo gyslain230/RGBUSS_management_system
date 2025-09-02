@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Save, Trash2, Package, AlertCircle } from 'lucide-react';
 import { supabase, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { validateInput, logSecurityEvent } from '../utils/security';
 import toast from 'react-hot-toast';
 
 interface SoldeEntry {

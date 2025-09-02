@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { supabase, clearCache } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { sanitizeInput, validateInput, logSecurityEvent } from '../../utils/security';
 import toast from 'react-hot-toast';
 
 interface AddProductModalProps {
