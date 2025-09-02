@@ -19,13 +19,25 @@ export default function AuthGuard({
   const { user, loading, sessionChecked } = useAuth();
   const location = useLocation();
 
-  // Show loading while checking authentication
-  if (loading || !sessionChecked) {
+  // Show loading while checking authentication - be more specific about when to show loading
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for session to be checked before making routing decisions
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading session...</p>
         </div>
       </div>
     );

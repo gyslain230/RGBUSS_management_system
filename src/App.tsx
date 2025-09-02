@@ -18,30 +18,9 @@ import CreditPanel from './pages/CreditPanel';
 // Security: Clear any potentially cached auth data on app start
 const clearAuthCache = () => {
   try {
-    // Security: Clear all possible auth-related data
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (
-        key.includes('supabase') || 
-        key.includes('auth') || 
-        key.includes('session') ||
-        key.includes('token') ||
-        key.includes('user') ||
-        key.includes('sb-')
-      )) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    // Security: Clear all session storage
-    sessionStorage.clear();
-    
-    // Security: Clear any cookies that might contain auth data
-    document.cookie.split(";").forEach(function(c) { 
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-    });
+    // Only clear cache, not auth tokens unless explicitly logging out
+    // This prevents clearing valid sessions on page refresh
+    console.log('Clearing cache only, preserving auth tokens');
   } catch (error) {
     console.warn('Failed to clear auth cache:', error);
   }
@@ -53,7 +32,8 @@ window.addEventListener('error', (event) => {
       event.error?.message?.includes('session') ||
       event.error?.message?.includes('token')) {
     console.warn('Auth-related error detected, clearing cache');
-    clearAuthCache();
+    // Don't automatically clear cache on auth errors
+    console.warn('Auth error detected but not clearing cache automatically');
   }
 });
 
@@ -65,25 +45,14 @@ function App() {
     const forceParam = urlParams.get('force');
     
     if (forceLogout === 'true' || forceParam === 'true') {
-      clearAuthCache();
+      // Only clear on explicit logout
+      localStorage.clear();
+      sessionStorage.clear();
       // Security: Clear URL parameters after processing
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // Security: Add beforeunload handler to clear sensitive data
-  React.useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Only clear cache, don't prevent unload
-      try {
-        clearAuthCache();
-      } catch (error) {
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
 
   return (
     <ThemeProvider>

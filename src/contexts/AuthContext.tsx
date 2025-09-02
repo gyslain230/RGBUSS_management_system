@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [authStateLoaded, setAuthStateLoaded] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Track if session warning has been shown to prevent spam
   const [sessionWarningShown, setSessionWarningShown] = useState(false);
@@ -57,20 +58,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Security: Always clear cache and check auth state
+    // Only clear cache, don't clear all storage on mount
     clearCache();
-    clearAllStorage();
     performInitialAuthCheck();
   }, []);
 
   // Security: Initial authentication check
   const performInitialAuthCheck = async () => {
     try {
+      setIsInitializing(true);
       setLoading(true);
       await checkAuthState();
     } finally {
       setInitialAuthCheck(true);
       setAuthStateLoaded(true);
+      setIsInitializing(false);
       setLoading(false);
     }
   };
@@ -153,12 +155,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         // Security: Validate user data integrity
         if (!currentUser.id || !currentUser.email || !currentUser.role) {
-          throw new Error('Invalid user data structure');
+          console.warn('Invalid user data structure, but not clearing session');
+          setUser(null);
+          setSessionTimeRemaining(0);
+          setSessionChecked(true);
+          return;
         }
         
         // Security: Validate role is legitimate
         if (!['admin', 'manager', 'worker'].includes(currentUser.role)) {
-          throw new Error('Invalid user role');
+          console.warn('Invalid user role, but not clearing session');
+          setUser(null);
+          setSessionTimeRemaining(0);
+          setSessionChecked(true);
+          return;
         }
         
         setUser(currentUser);
@@ -171,10 +181,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error('Auth state check failed:', error);
-      setUser(null);
-      setSessionTimeRemaining(0);
+      // Don't clear user state on temporary errors during initial load
+      if (!isInitializing) {
+        setUser(null);
+        setSessionTimeRemaining(0);
+      }
       setSessionChecked(true);
-      // Don't force logout on auth check failure, just clear state
     }
   };
 
@@ -387,7 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    loading: loading || !initialAuthCheck,
+    loading: loading || !initialAuthCheck || isInitializing,
     sessionChecked,
     sessionTimeRemaining,
     signIn,

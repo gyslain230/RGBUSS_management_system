@@ -167,37 +167,40 @@ export const getCurrentUser = async (): Promise<User | null> => {
   }
 
   try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 10000);
-    });
-
-    const userPromise = supabase.auth.getUser();
-    const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
+    // First check if we have a session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    if (userError || !user) {
+    if (sessionError || !session?.user) {
       return null;
     }
-
-    const profilePromise = supabase
+    
+    const user = session.user;
+    
+    // Get user profile from database
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
-
     if (profileError) {
+      // If profile doesn't exist, try to create it
       if (profileError.code === 'PGRST116') {
-        const { data: newProfile } = await supabase
+        const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert([{
             id: user.id,
             email: user.email || '',
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            role: 'worker'
+            role: user.user_metadata?.role || 'worker'
           }])
           .select()
           .single();
+          
+        if (createError) {
+          console.error('Failed to create profile:', createError);
+          return null;
+        }
         return newProfile;
       }
       return null;
@@ -205,6 +208,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     return profile;
   } catch (error: any) {
+    console.error('getCurrentUser error:', error);
     return null;
   }
 };
