@@ -74,20 +74,20 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400">Welcome back, {user?.full_name}</p>
+        <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="text-gray-600 dark:text-gray-400 lg:text-lg">Welcome back, {user?.full_name}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Products</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalProducts}</p>
+              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{stats.totalProducts}</p>
             </div>
-            <Package className="h-8 w-8 text-blue-600" />
+            <Package className="h-8 w-8 lg:h-10 lg:w-10 text-blue-600" />
           </div>
         </div>
 
@@ -95,9 +95,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalUsers}</p>
+              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{stats.totalUsers}</p>
             </div>
-            <Users className="h-8 w-8 text-green-600" />
+            <Users className="h-8 w-8 lg:h-10 lg:w-10 text-green-600" />
           </div>
         </div>
 
@@ -105,9 +105,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Credits</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${stats.totalCredits.toFixed(2)}</p>
+              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">${stats.totalCredits.toFixed(2)}</p>
             </div>
-            <DollarSign className="h-8 w-8 text-orange-600" />
+            <DollarSign className="h-8 w-8 lg:h-10 lg:w-10 text-orange-600" />
           </div>
         </div>
 
@@ -115,9 +115,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock Items</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.lowStockProducts}</p>
+              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{stats.lowStockProducts}</p>
             </div>
-            <AlertTriangle className="h-8 w-8 text-red-600" />
+            <AlertTriangle className="h-8 w-8 lg:h-10 lg:w-10 text-red-600" />
           </div>
         </div>
 
@@ -125,9 +125,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${stats.todayRevenue.toFixed(2)}</p>
+              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">${stats.todayRevenue.toFixed(2)}</p>
             </div>
-            <TrendingUp className="h-8 w-8 text-purple-600" />
+            <TrendingUp className="h-8 w-8 lg:h-10 lg:w-10 text-purple-600" />
           </div>
         </div>
 
@@ -135,9 +135,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Analytics</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">View Reports</p>
+              <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">View Reports</p>
             </div>
-            <BarChart3 className="h-8 w-8 text-indigo-600" />
+            <BarChart3 className="h-8 w-8 lg:h-10 lg:w-10 text-indigo-600" />
           </div>
         </div>
       </div>

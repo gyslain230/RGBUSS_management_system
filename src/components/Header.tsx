@@ -52,26 +52,26 @@ export default function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0 sticky top-0 z-30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16 lg:h-18">
           <div className="flex items-center">
             {/* Mobile menu button */}
             <button
               onClick={onMenuClick}
-              className="md:hidden p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="md:hidden p-2 mr-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
             
-            <h1 className="ml-4 text-xl font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white">
               Business Management System
             </h1>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 lg:space-x-6">
             {user && showSessionTimer && sessionTimeRemaining > 0 && (
-              <div className="flex items-center space-x-2">
+              <div className="hidden sm:flex items-center space-x-2">
                 <Shield className="h-4 w-4 text-orange-500" />
                 <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
                   sessionTimeRemaining < 2 * 60 * 1000 
@@ -92,22 +92,22 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             <ThemeToggle />
 
-            <button className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 relative transition-colors">
+            <button className="hidden sm:block p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 relative transition-colors">
               <Bell className="h-6 w-6" />
               <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white dark:ring-gray-800"></span>
             </button>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 lg:space-x-4">
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                  <span className="text-sm lg:text-base font-medium text-blue-800 dark:text-blue-200">
                     {user?.full_name?.charAt(0).toUpperCase()}
                   </span>
                 </div>
               </div>
-              <div className="hidden md:block">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">{user?.full_name}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+              <div className="hidden lg:block">
+                <div className="text-sm lg:text-base font-medium text-gray-900 dark:text-white">{user?.full_name}</div>
+                <div className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 flex items-center">
                   <Mail className="h-3 w-3 mr-1" />
                   {user?.email} • {user?.role}
                 </div>
@@ -115,10 +115,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <button
                 onClick={handleSignOut}
                 disabled={loading}
-                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                className="p-2 lg:p-3 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
                 title="Sign out"
               >
-                <LogOut className="h-5 w-5" />
+                <LogOut className="h-5 w-5 lg:h-6 lg:w-6" />
               </button>
             </div>
           </div>

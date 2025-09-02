@@ -103,17 +103,17 @@ export default function UserManagement() {
   return (
     <div className="space-y-6 dark:bg-gray-900 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage user accounts and permissions</p>
-          <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white">User Management</h1>
+          <p className="text-gray-600 dark:text-gray-400 lg:text-lg">Manage user accounts and permissions</p>
+          <p className="text-sm lg:text-base text-blue-600 dark:text-blue-400 mt-1">
             📧 Users authenticate with email addresses and passwords
           </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
+          className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add User

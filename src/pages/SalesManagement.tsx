@@ -193,24 +193,24 @@ export default function SalesManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 lg:space-y-8">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sales Management</h1>
-          <p className="text-gray-600">Manage product solde (stock balance) and update daily reports</p>
-          <p className="text-sm text-blue-600 mt-1">
+          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Sales Management</h1>
+          <p className="text-gray-600 lg:text-lg">Manage product solde (stock balance) and update daily reports</p>
+          <p className="text-sm lg:text-base text-blue-600 mt-1">
             📊 Solde changes will be reflected in Daily Reports for all users • All data stored in localStorage
           </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 lg:p-8">
         <div className="flex items-center mb-4">
           <Package className="h-5 w-5 text-blue-600 mr-2" />
-          <h2 className="text-lg font-semibold text-gray-900">Add Solde Entry</h2>
+          <h2 className="text-lg lg:text-xl font-semibold text-gray-900">Add Solde Entry</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Select Product
@@ -218,7 +218,7 @@ export default function SalesManagement() {
             <select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 lg:px-4 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Choose a product...</option>
               {availableProducts.map((product) => (

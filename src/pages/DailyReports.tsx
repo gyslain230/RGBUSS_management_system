@@ -524,30 +524,30 @@ export default function DailyReports() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
+    <div className="space-y-6 lg:space-y-8">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Daily Reports</h1>
-          <p className="text-gray-600">Comprehensive daily inventory and sales report</p>
-          <div className="flex items-center space-x-4 mt-2">
-            <p className="text-sm text-green-600">
+          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Daily Reports</h1>
+          <p className="text-gray-600 lg:text-lg">Comprehensive daily inventory and sales report</p>
+          <div className="flex items-center space-x-4 mt-2 lg:mt-3">
+            <p className="text-sm lg:text-base text-green-600">
               📊 {useStoredData ? 'Showing stored database report' : 'Showing live generated report'}
             </p>
             <span className="text-gray-300">•</span>
-            <p className="text-sm text-blue-600">
+            <p className="text-sm lg:text-base text-blue-600">
               📈 {adjustmentsFound} adjustments found for {selectedDate}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+          <div className="flex items-center space-x-2 lg:space-x-3">
             <Calendar className="h-5 w-5 text-gray-400" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-2 lg:px-4 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -555,7 +555,7 @@ export default function DailyReports() {
             <button
               onClick={handleGenerateAndStore}
               disabled={generating}
-              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center px-3 py-2 lg:px-4 lg:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
             >
               <Database className={`h-4 w-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
               {generating ? 'Storing...' : 'Generate & Store'}
@@ -565,7 +565,7 @@ export default function DailyReports() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center px-3 py-2 lg:px-4 lg:py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -573,7 +573,7 @@ export default function DailyReports() {
 
           <button
             onClick={handleExportReport}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Download className="h-4 w-4 mr-2" />
             Export PDF
@@ -650,27 +650,27 @@ export default function DailyReports() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Products</p>
-          <p className="text-2xl font-bold text-gray-900">{reportData.length}</p>
+          <p className="text-2xl lg:text-3xl font-bold text-gray-900">{reportData.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Stock</p>
-          <p className="text-2xl font-bold text-blue-600">
+          <p className="text-2xl lg:text-3xl font-bold text-blue-600">
             {totals.totalStock}
           </p>
           {isFirstDay && <p className="text-xs text-blue-500">First day - all 0</p>}
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Entres</p>
-          <p className="text-2xl font-bold text-green-600">
+          <p className="text-2xl lg:text-3xl font-bold text-green-600">
             {totals.totalEntres}
           </p>
           <p className="text-xs text-green-500">New products + adjustments</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Revenue</p>
-          <p className="text-2xl font-bold text-green-600">
+          <p className="text-2xl lg:text-3xl font-bold text-green-600">
             ${totals.totalPTotal.toFixed(2)}
           </p>
         </div>

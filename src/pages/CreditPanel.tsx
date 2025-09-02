@@ -86,19 +86,19 @@ export default function CreditPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Credit Panel</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Credit Panel</h1>
+          <p className="text-gray-600 lg:text-lg">
             Monitor and manage credit sales
             {user?.role === 'worker' && (
               <span className="text-orange-600 ml-2">(View Only - Contact manager to mark payments)</span>
             )}
           </p>
-          <div className="flex items-center space-x-4 mt-2">
-            <p className="text-sm text-green-600">
+          <div className="flex items-center space-x-4 mt-2 lg:mt-3">
+            <p className="text-sm lg:text-base text-green-600">
               📊 Credit metrics are synced with Dashboard
             </p>
           </div>
@@ -108,7 +108,7 @@ export default function CreditPanel() {
         {canAddCredits && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Credit
@@ -117,16 +117,16 @@ export default function CreditPanel() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Pending Credits</p>
-              <p className="text-2xl font-bold text-orange-600">${totalPending.toFixed(2)}</p>
+              <p className="text-2xl lg:text-3xl font-bold text-orange-600">${totalPending.toFixed(2)}</p>
               <p className="text-xs text-orange-500 mt-1">{pendingCount} credits</p>
             </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <CreditCard className="h-6 w-6 text-orange-600" />
+            <div className="p-3 lg:p-4 bg-orange-100 rounded-lg">
+              <CreditCard className="h-6 w-6 lg:h-8 lg:w-8 text-orange-600" />
             </div>
           </div>
         </div>

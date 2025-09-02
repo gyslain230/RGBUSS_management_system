@@ -64,21 +64,21 @@ export default function StockManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
-          <p className="text-gray-600">Manage your inventory and product listings</p>
-          <p className="text-sm text-green-600 mt-1">
+          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Stock Management</h1>
+          <p className="text-gray-600 lg:text-lg">Manage your inventory and product listings</p>
+          <p className="text-sm lg:text-base text-green-600 mt-1">
             ✅ All products are automatically approved and ready to use
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 lg:space-x-4">
           {/* Global History Button */}
           <button
             onClick={() => setShowGlobalHistory(!showGlobalHistory)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <History className="h-4 w-4 mr-2" />
             {showGlobalHistory ? 'Hide' : 'Show'} History
@@ -87,7 +87,7 @@ export default function StockManagement() {
           {/* Add Product Button */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
