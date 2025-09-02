@@ -199,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authKeys.forEach(key => localStorage.removeItem(key));
       
       const { data } = await signInWithEmail(normalizedEmail, password);
-      console.log('Authentication response received:', !!data.user);
+      console.log('Authentication response received:', !!authResponse?.user);
       
       if (!data || !data.user || !data.session) {
         throw new Error('Authentication failed - invalid response');
