@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bell, LogOut, Mail, Clock, Shield, Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { clearCache } from '../utils/security';
 import ThemeToggle from './ThemeToggle';
 
 interface HeaderProps {
