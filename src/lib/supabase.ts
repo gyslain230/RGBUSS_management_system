@@ -328,7 +328,7 @@ export const signInWithEmail = async (email: string, password: string) => {
   try {
     console.log('Attempting sign in for:', email);
     
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const response = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
@@ -337,7 +337,14 @@ export const signInWithEmail = async (email: string, password: string) => {
 
     if (error) {
       console.error('Authentication error:', error);
-      
+    // Check if response exists
+    if (!response) {
+      throw new Error('No response from authentication service');
+    }
+
+    const { data, error } = response;
+
+    if (error) {
       if (error.message?.includes('Invalid login credentials')) {
         throw new Error('Invalid email or password');
       } else if (error.message?.includes('Email not confirmed')) {
@@ -349,22 +356,37 @@ export const signInWithEmail = async (email: string, password: string) => {
       }
     }
 
-    if (!data) {
-      throw new Error('Authentication failed - no response data');
+    // Validate response data structure
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid authentication response format');
     }
+
     if (!data.user) {
-      throw new Error('No user data returned');
+      throw new Error('Authentication successful but no user data received');
     }
 
     if (!data.session) {
-      throw new Error('No session created');
+      throw new Error('Authentication successful but no session created');
+    }
+
+    // Validate user object structure
+    if (!data.user.id || !data.user.email) {
+      throw new Error('Invalid user data structure received');
     }
 
     console.log('Authentication successful for:', data.user.email);
     return data;
     
   } catch (error: any) {
-    console.error('Sign in error:', error);
+    // Re-throw with more context if it's our custom error
+    if (error.message?.includes('Authentication') || 
+        error.message?.includes('Invalid') ||
+        error.message?.includes('No response')) {
+      throw error;
+    }
+    
+    // For unexpected errors, provide a generic message
+    throw new Error('Login failed due to a technical issue. Please try again.');
     throw error;
   }
 };
