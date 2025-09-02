@@ -14,7 +14,7 @@ interface UserProfile {
   updated_at: string;
 }
 
-export default function UserManagement() {
+const UserManagement = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -247,4 +247,3 @@ export default function UserManagement() {
       </div>
     </div>
   );
-}
