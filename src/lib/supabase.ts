@@ -410,10 +410,15 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
     throw new Error('Please enter a valid email address');
   }
 
-  const passwordValidation = validatePasswordStrength(password);
-  if (!passwordValidation.isValid) {
+  // Password validation
+  const passwordCheck = password.length >= 8 && 
+                       /[A-Z]/.test(password) && 
+                       /[a-z]/.test(password) && 
+                       /\d/.test(password);
+  
+  if (!passwordCheck) {
     logSecurityEvent('signup_weak_password');
-    throw new Error(passwordValidation.errors[0] || 'Password does not meet requirements');
+    throw new Error('Password must be at least 8 characters with uppercase, lowercase, and numbers');
   }
 
   const nameValidation = validateInput.name(sanitizedFullName);

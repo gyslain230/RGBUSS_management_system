@@ -491,7 +491,3 @@ export const logSecurityEvent = (event: string, details?: any): void => {
     
     localStorage.setItem('audit_logs', JSON.stringify(auditLogs));
   }
-};
-
-
-export { sanitizeInput, logSecurityEvent }

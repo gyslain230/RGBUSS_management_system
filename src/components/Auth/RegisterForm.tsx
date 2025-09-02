@@ -79,10 +79,10 @@ export default function RegisterForm() {
         throw new Error('Please enter a valid email address');
       }
 
-      const passwordValidation = validatePasswordStrength(password);
-      if (!passwordValidation.isValid) {
+      // Password validation already done above
+      if (password.length < 8 || !hasUpperCase || !hasLowerCase || !hasNumbers) {
         logSecurityEvent('signup_weak_password');
-        throw new Error(passwordValidation.errors[0] || 'Password does not meet requirements');
+        throw new Error('Password does not meet requirements');
       }
 
       const nameValidation = validateInput.name(sanitizedFullName);
