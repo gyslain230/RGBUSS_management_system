@@ -46,7 +46,18 @@ export default function StockAdjustmentModal({
   const watchQuantity = watch("quantity") || 0;
 
   const onSubmit = async (data: AdjustmentFormData) => {
-    if (!user) return;
+    // Security: Validate user session and permissions
+    if (!user?.id) {
+      toast.error('Authentication required');
+      onClose();
+      return;
+    }
+
+    // Security: Validate user permissions
+    if (!['admin', 'manager', 'worker'].includes(user.role)) {
+      toast.error('Insufficient permissions');
+      return;
+    }
 
     // Convert quantity to number to ensure proper calculation
     const adjustmentQuantity = Number(data.quantity);
@@ -63,6 +74,12 @@ export default function StockAdjustmentModal({
 
     if (adjustmentQuantity <= 0) {
       toast.error("Quantity must be greater than zero");
+      return;
+    }
+
+    // Security: Validate reason is provided
+    if (!data.reason?.trim()) {
+      toast.error('Reason for adjustment is required');
       return;
     }
 
@@ -95,7 +112,7 @@ export default function StockAdjustmentModal({
             quantity_adjusted: adjustmentQuantity,
             previous_quantity: previousQuantity,
             new_quantity: newQuantity,
-            reason: data.reason,
+            reason: data.reason.trim().substring(0, 200), // Security: Limit reason length
             adjusted_by: user.id,
             adjusted_by_name: user.full_name,
           },
@@ -116,7 +133,9 @@ export default function StockAdjustmentModal({
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error("Error adjusting stock");
+      // Security: Don't expose internal errors
+      console.error('Stock adjustment error:', error);
+      toast.error('Failed to adjust stock. Please try again.');
     } finally {
       setLoading(false);
     }

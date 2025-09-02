@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, RefreshCw, Info, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Product, Sale, StockAdjustment, Credit, DailyReportStorage, getDailyReportsStorage, generateDailyReport, getDailyReportForDate } from '../lib/supabase';
+import { supabase, Product, Sale, StockAdjustment, Credit, DailyReportStorage, getDailyReportsStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -40,6 +40,17 @@ export default function DailyReports() {
   const [adjustmentsFound, setAdjustmentsFound] = useState(0);
   const [hasReportData, setHasReportData] = useState(false);
   const [useStoredData, setUseStoredData] = useState(false);
+
+  // Security: Validate user permissions
+  useEffect(() => {
+    if (!user) {
+      toast.error('Authentication required');
+      return;
+    }
+    
+    // Clear any cached data when user changes
+    clearCache();
+  }, [user?.id]);
 
   useEffect(() => {
     fetchReportData();
@@ -84,6 +95,11 @@ export default function DailyReports() {
   const fetchReportData = async () => {
     setLoading(true);
     try {
+      // Security: Validate user session before fetching data
+      if (!user?.id) {
+        throw new Error('User session invalid');
+      }
+
       const storedData = await getDailyReportForDate(selectedDate);
       
       if (storedData && storedData.length > 0) {
@@ -115,7 +131,13 @@ export default function DailyReports() {
       await fetchCreditsForDate();
       
     } catch (error) {
-      toast.error('Error loading report data');
+      // Security: Don't expose internal errors
+      if (error instanceof Error && error.message.includes('session invalid')) {
+        toast.error('Please sign in again');
+        window.location.href = '/login';
+      } else {
+        toast.error('Error loading report data');
+      }
       setHasReportData(false);
     } finally {
       setLoading(false);
@@ -124,6 +146,11 @@ export default function DailyReports() {
 
   const generateLiveReport = async () => {
     try {
+      // Security: Validate permissions
+      if (!user?.id) {
+        throw new Error('Authentication required');
+      }
+
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('*')
@@ -208,6 +235,11 @@ export default function DailyReports() {
 
   const fetchCreditsForDate = async () => {
     try {
+      // Security: Validate user session
+      if (!user?.id) {
+        return;
+      }
+
       const startOfDay = `${selectedDate}T00:00:00.000Z`;
       const endOfDay = `${selectedDate}T23:59:59.999Z`;
 
@@ -235,6 +267,12 @@ export default function DailyReports() {
   const handleGenerateAndStore = async () => {
     setGenerating(true);
     try {
+      // Security: Validate permissions
+      if (!user?.id) {
+        toast.error('Authentication required');
+        return;
+      }
+
       const result = await generateDailyReport(selectedDate);
       
       toast.success(`Daily report generated and stored! ${result.products_processed} products processed.`);
@@ -250,6 +288,12 @@ export default function DailyReports() {
   const handleExportReport = () => {
     if (!hasReportData || (reportData.length === 0 && creditsData.length === 0 && adjustmentsFound === 0)) {
       toast.error(`No daily report data found for ${format(new Date(selectedDate), 'MMMM dd, yyyy')}. Please select a date with stock adjustments or credits.`);
+      return;
+    }
+
+    // Security: Validate user session before export
+    if (!user?.id) {
+      toast.error('Authentication required for export');
       return;
     }
 

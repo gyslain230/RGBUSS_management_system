@@ -16,15 +16,34 @@ export default function Header() {
   
   const handleSignOut = async () => {
     try {
-      await signOut();
-      // Force page reload to clear any remaining state
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Sign out error:', error);
-      // Force logout even if there's an error
+      // Security: Clear all possible auth data before sign out
+      clearCache();
       localStorage.clear();
       sessionStorage.clear();
-      window.location.href = '/login';
+      
+      // Clear any Supabase auth tokens
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('auth') || key.includes('session'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+
+      await signOut();
+      
+      // Security: Force complete page reload and redirect
+      window.location.replace('/login?logout=true');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Security: Force logout even if there's an error
+      clearCache();
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Force redirect even on error
+      window.location.replace('/login?logout=true&force=true');
     }
   };
 

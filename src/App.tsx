@@ -17,32 +17,78 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Security: Clear any potentially cached auth data on app start
 const clearAuthCache = () => {
   try {
-    // Clear localStorage items that might contain auth data
+    // Security: Clear all possible auth-related data
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.includes('supabase') || key.includes('auth') || key.includes('session'))) {
+      if (key && (
+        key.includes('supabase') || 
+        key.includes('auth') || 
+        key.includes('session') ||
+        key.includes('token') ||
+        key.includes('user') ||
+        key.includes('sb-')
+      )) {
         keysToRemove.push(key);
       }
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
     
-    // Clear sessionStorage
+    // Security: Clear all session storage
     sessionStorage.clear();
+    
+    // Security: Clear any cookies that might contain auth data
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
   } catch (error) {
     console.warn('Failed to clear auth cache:', error);
   }
 };
+
+// Security: Add global error handler for auth errors
+window.addEventListener('error', (event) => {
+  if (event.error?.message?.includes('auth') || 
+      event.error?.message?.includes('session') ||
+      event.error?.message?.includes('token')) {
+    console.warn('Auth-related error detected, clearing cache');
+    clearAuthCache();
+  }
+});
+
 function App() {
   React.useEffect(() => {
-    // Security: Clear any stale auth data on app initialization
+    // Security: Enhanced auth cache clearing on app initialization
     const urlParams = new URLSearchParams(window.location.search);
     const forceLogout = urlParams.get('logout');
+    const forceParam = urlParams.get('force');
     
-    if (forceLogout === 'true') {
+    if (forceLogout === 'true' || forceParam === 'true') {
       clearAuthCache();
+      // Security: Clear URL parameters after processing
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    
+    // Security: Always clear cache on fresh app load
+    const isPageRefresh = performance.navigation?.type === 1;
+    if (isPageRefresh) {
+      clearAuthCache();
+    }
+  }, []);
+
+  // Security: Add beforeunload handler to clear sensitive data
+  React.useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Only clear cache, don't prevent unload
+      try {
+        clearAuthCache();
+      } catch (error) {
+        console.warn('Failed to clear cache on unload:', error);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   return (

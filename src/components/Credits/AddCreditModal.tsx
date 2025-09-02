@@ -56,17 +56,58 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
   };
 
   const onSubmit = async (data: CreditFormData) => {
-    if (!user || !selectedProduct) return;
+    // Security: Validate user session and permissions
+    if (!user?.id) {
+      toast.error('Authentication required');
+      onClose();
+      return;
+    }
+
+    if (!selectedProduct) {
+      toast.error('Please select a product');
+      return;
+    }
+
+    // Security: Validate user permissions
+    if (!['admin', 'manager', 'worker'].includes(user.role)) {
+      toast.error('Insufficient permissions');
+      return;
+    }
+
+    // Security: Validate and sanitize input data
+    if (!data.customer_name?.trim()) {
+      toast.error('Customer name is required');
+      return;
+    }
+
+    if (data.amount <= 0) {
+      toast.error('Credit amount must be greater than 0');
+      return;
+    }
+
+    const dueDate = new Date(data.due_date);
+    const today = new Date();
+    if (dueDate < today) {
+      toast.error('Due date cannot be in the past');
+      return;
+    }
 
     setLoading(true);
     try {
+      // Security: Sanitize inputs
+      const sanitizedData = {
+        customer_name: data.customer_name.trim().substring(0, 100),
+        amount: Math.max(0.01, Number(data.amount)),
+        due_date: data.due_date
+      };
+
       const { error } = await supabase
         .from('credits')
         .insert([{
-          customer_name: data.customer_name.trim(),
+          customer_name: sanitizedData.customer_name,
           product_name: selectedProduct.name,
-          amount: data.amount,
-          due_date: data.due_date,
+          amount: sanitizedData.amount,
+          due_date: sanitizedData.due_date,
           issued_by: user.id,
           status: 'pending',
           sale_id: null
@@ -81,7 +122,9 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
       setSelectedProduct(null);
       onSuccess();
     } catch (error) {
-      toast.error('Error adding credit');
+      // Security: Don't expose internal errors
+      console.error('Credit creation error:', error);
+      toast.error('Failed to add credit. Please try again.');
     } finally {
       setLoading(false);
     }

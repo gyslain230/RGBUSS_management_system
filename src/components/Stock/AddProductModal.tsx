@@ -26,19 +26,50 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProductFormData>();
 
   const onSubmit = async (data: ProductFormData) => {
-    if (!user) return;
+    // Security: Validate user session and permissions
+    if (!user?.id) {
+      toast.error('Authentication required');
+      onClose();
+      return;
+    }
+
+    // Security: Validate user permissions
+    if (!['admin', 'manager', 'worker'].includes(user.role)) {
+      toast.error('Insufficient permissions');
+      return;
+    }
+
+    // Security: Validate and sanitize input data
+    if (!data.name?.trim() || !data.category?.trim()) {
+      toast.error('Product name and category are required');
+      return;
+    }
+
+    if (data.price <= 0 || data.quantity < 0) {
+      toast.error('Invalid price or quantity values');
+      return;
+    }
 
     setLoading(true);
     try {
+      // Security: Sanitize inputs
+      const sanitizedData = {
+        name: data.name.trim().substring(0, 100), // Limit length
+        price: Math.max(0.01, Number(data.price)),
+        quantity: Math.max(0, Math.floor(Number(data.quantity))),
+        category: data.category.trim().substring(0, 50),
+        description: data.description?.trim().substring(0, 500) || null
+      };
+
       // Create the product - always approved now
       const { data: productData, error: productError } = await supabase
         .from('products')
         .insert([{
-          name: data.name,
-          price: data.price,
-          quantity: data.quantity,
-          category: data.category,
-          description: data.description,
+          name: sanitizedData.name,
+          price: sanitizedData.price,
+          quantity: sanitizedData.quantity,
+          category: sanitizedData.category,
+          description: sanitizedData.description,
           status: 'approved', // Always approved
           created_by: user.id,
         }])
@@ -48,16 +79,16 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
       if (productError) throw productError;
 
       // If product has quantity > 0, record it as a stock adjustment (entres)
-      if (productData && data.quantity > 0) {
+      if (productData && sanitizedData.quantity > 0) {
         const { error: adjustmentError } = await supabase
           .from('stock_adjustments')
           .insert([{
             product_id: productData.id,
-            product_name: data.name,
+            product_name: sanitizedData.name,
             adjustment_type: 'increase',
-            quantity_adjusted: data.quantity,
+            quantity_adjusted: sanitizedData.quantity,
             previous_quantity: 0,
-            new_quantity: data.quantity,
+            new_quantity: sanitizedData.quantity,
             reason: 'Initial stock entry for new product',
             adjusted_by: user.id,
             adjusted_by_name: user.full_name
@@ -68,13 +99,15 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
         }
       }
 
-      toast.success(`Product added successfully! ${data.quantity > 0 ? 'Initial stock recorded as entres.' : ''}`);
+      toast.success(`Product added successfully! ${sanitizedData.quantity > 0 ? 'Initial stock recorded as entres.' : ''}`);
       
       clearCache('products');
       reset();
       onSuccess();
     } catch (error) {
-      toast.error('Error adding product');
+      // Security: Don't expose internal errors
+      console.error('Product creation error:', error);
+      toast.error('Failed to add product. Please try again.');
     } finally {
       setLoading(false);
     }
