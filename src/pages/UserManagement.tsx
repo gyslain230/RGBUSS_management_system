@@ -101,7 +101,7 @@ const UserManagement = () => {
   }
 
   return (
-    <div className="space-y-6 dark:bg-gray-900 min-h-screen">
+    <div className="space-y-6 dark:bg-gray-900 min-h-screen w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
