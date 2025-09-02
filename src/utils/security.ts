@@ -78,7 +78,6 @@ export const clearAllStorage = (): void => {
       });
     }
   } catch (error) {
-    console.warn('Failed to clear all storage:', error);
   }
 };
 

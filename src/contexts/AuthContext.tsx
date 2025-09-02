@@ -353,7 +353,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
       if (event.error?.message?.includes('auth') || event.error?.message?.includes('session')) {
-        console.error('Global auth error:', event.error);
         performCompleteLogout();
       }
     };

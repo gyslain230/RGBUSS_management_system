@@ -123,7 +123,6 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
       onSuccess();
     } catch (error) {
       // Security: Don't expose internal errors
-      console.error('Credit creation error:', error);
       toast.error('Failed to add credit. Please try again.');
     } finally {
       setLoading(false);

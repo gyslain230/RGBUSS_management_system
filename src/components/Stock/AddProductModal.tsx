@@ -106,7 +106,6 @@ export default function AddProductModal({ isOpen, onClose, onSuccess }: AddProdu
       onSuccess();
     } catch (error) {
       // Security: Don't expose internal errors
-      console.error('Product creation error:', error);
       toast.error('Failed to add product. Please try again.');
     } finally {
       setLoading(false);

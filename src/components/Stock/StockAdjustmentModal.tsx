@@ -134,7 +134,6 @@ export default function StockAdjustmentModal({
       onClose();
     } catch (error) {
       // Security: Don't expose internal errors
-      console.error('Stock adjustment error:', error);
       toast.error('Failed to adjust stock. Please try again.');
     } finally {
       setLoading(false);

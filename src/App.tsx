@@ -77,7 +77,6 @@ function App() {
       try {
         clearAuthCache();
       } catch (error) {
-        console.warn('Failed to clear cache on unload:', error);
       }
     };
 

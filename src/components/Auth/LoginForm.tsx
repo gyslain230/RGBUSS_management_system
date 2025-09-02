@@ -73,8 +73,6 @@ export default function LoginForm() {
         throw new Error('Authentication completed but success flag not set');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      
       // Show user-friendly error message
       const errorMessage = error?.message || 'Sign in failed. Please try again.';
       toast.error(errorMessage);
