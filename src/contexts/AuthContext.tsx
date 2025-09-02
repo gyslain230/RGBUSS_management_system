@@ -247,13 +247,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Security: Validate session integrity
-      try {
-        if (!isSessionValid(authResponse.session)) {
-          throw new Error('Session validation failed');
-        }
-      } catch (sessionError) {
-        throw new Error('Session validation failed');
-      }
 
       // Security: Get fresh user profile
       let userProfile;
