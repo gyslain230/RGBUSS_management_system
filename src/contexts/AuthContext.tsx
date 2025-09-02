@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, getCurrentUser } from '../lib/supabase';
+import { clearCache } from '../lib/supabase';
 import { clearAllStorage, loginRateLimiter, sanitizeInput, isValidEmail, logSecurityEvent, sanitizeErrorMessage, validateInput } from '../utils/security';
 import toast from 'react-hot-toast';
 
