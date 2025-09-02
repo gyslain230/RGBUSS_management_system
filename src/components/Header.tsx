@@ -43,7 +43,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
     } catch (error) {
       console.error('Sign out error:', error);
       // Security: Force logout even if there's an error
-      clearCache();
       localStorage.clear();
       sessionStorage.clear();
       

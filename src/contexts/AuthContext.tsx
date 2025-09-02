@@ -197,6 +197,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return () => clearInterval(interval);
     }
+  }
+  )
 
   // Security: Enhanced sign in with comprehensive validation
   const signIn = async (email: string, password: string) => {
@@ -406,5 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
+  );
+}text.Provider>
   );
 }
