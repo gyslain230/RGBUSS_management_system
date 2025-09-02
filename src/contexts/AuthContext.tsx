@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, getCurrentUser, clearCache } from '../lib/supabase';
-import { clearAllStorage, isSessionValid, loginRateLimiter } from '../utils/security';
+import { clearAllStorage, isSessionValid, loginRateLimiter, sanitizeInput, validateEmail, validatePassword } from '../utils/security';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0);
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Security: Clear all auth data immediately on provider mount
+  // Security: Complete auth data clearing on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const forceLogout = urlParams.get('logout') === 'true';
@@ -48,18 +48,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (forceLogout || forceParam) {
       // Security: Force complete logout
-      clearAllStorage();
-      clearCache();
-      setUser(null);
-      setSessionChecked(true);
-      setLoading(false);
-      
-      // Clear URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
+      performCompleteLogout();
       return;
     }
 
-    // Security: Always check for stale sessions on mount
+    // Security: Always clear cache and check auth state
+    clearCache();
+    clearAllStorage();
     checkAuthState();
   }, []);
 
@@ -70,7 +65,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSessionTimeRemaining(prev => {
           const newTime = prev - 1000;
           if (newTime <= 0) {
-            // Security: Force logout on session expiry
             handleSessionExpiry();
             return 0;
           }
@@ -86,16 +80,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Security: Handle session expiry
   const handleSessionExpiry = useCallback(async () => {
     toast.error('Session expired. Please sign in again.');
-    await performSecureSignOut();
+    await performCompleteLogout();
   }, []);
+
+  // Security: Complete logout function
+  const performCompleteLogout = async () => {
+    try {
+      // Clear session timer
+      if (sessionTimer) {
+        clearInterval(sessionTimer);
+        setSessionTimer(null);
+      }
+
+      // Clear user state immediately
+      setUser(null);
+      setSessionTimeRemaining(0);
+      setSessionChecked(false);
+      
+      // Clear all caches and storage
+      clearCache();
+      clearAllStorage();
+      
+      // Sign out from Supabase
+      await supabaseSignOut();
+      
+      // Force page redirect to login
+      window.location.replace('/login');
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if error occurs
+      setUser(null);
+      setSessionTimeRemaining(0);
+      clearCache();
+      clearAllStorage();
+      window.location.replace('/login');
+    }
+  };
 
   // Security: Enhanced auth state checking
   const checkAuthState = async () => {
     try {
       setLoading(true);
-      
-      // Security: Clear any potentially stale data first
-      clearCache();
       
       const currentUser = await getCurrentUser();
       
@@ -111,25 +137,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         
         setUser(currentUser);
-        
-        // Security: Set session timeout (1 hour)
-        setSessionTimeRemaining(60 * 60 * 1000);
+        setSessionTimeRemaining(60 * 60 * 1000); // 1 hour
       } else {
         setUser(null);
         setSessionTimeRemaining(0);
       }
     } catch (error: any) {
       console.error('Auth state check failed:', error);
-      
-      // Security: Clear everything on auth check failure
-      await performSecureSignOut();
+      await performCompleteLogout();
     } finally {
       setSessionChecked(true);
       setLoading(false);
     }
   };
 
-  // Security: Enhanced sign in with rate limiting
+  // Security: Enhanced sign in with comprehensive validation
   const signIn = async (email: string, password: string) => {
     // Security: Input validation
     if (!email?.trim() || !password) {
@@ -138,6 +160,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const normalizedEmail = email.trim().toLowerCase();
     
+    // Security: Email validation
+    if (!validateEmail(normalizedEmail)) {
+      throw new Error('Please enter a valid email address');
+    }
+
     // Security: Rate limiting
     if (!loginRateLimiter.isAllowed(normalizedEmail)) {
       const remainingTime = Math.ceil(loginRateLimiter.getRemainingTime(normalizedEmail) / 60000);
@@ -183,11 +210,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setSessionTimeRemaining(0);
       clearCache();
+      clearAllStorage();
       
-      // Security: Don't expose internal errors
+      // Security: Sanitized error messages
       const userFriendlyMessage = error.message?.includes('Invalid login credentials') 
         ? 'Invalid email or password'
-        : error.message?.includes('Too many requests')
+        : error.message?.includes('Too many requests') || error.message?.includes('rate limit')
         ? error.message
         : error.message?.includes('network') || error.message?.includes('fetch')
         ? 'Network error. Please check your connection.'
@@ -199,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Security: Enhanced sign up with validation
+  // Security: Enhanced sign up with comprehensive validation
   const signUp = async (email: string, password: string, fullName: string, role: 'admin' | 'manager' | 'worker' = 'worker') => {
     // Security: Input validation and sanitization
     if (!email?.trim() || !password || !fullName?.trim()) {
@@ -207,19 +235,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const sanitizedFullName = fullName.trim().replace(/[<>]/g, ''); // Basic XSS protection
+    const sanitizedFullName = sanitizeInput(fullName.trim());
 
     // Security: Enhanced validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    if (!validateEmail(normalizedEmail)) {
       throw new Error('Please enter a valid email address');
     }
 
-    if (password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
-    }
-
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      throw new Error('Password must contain uppercase, lowercase, and numbers');
+    if (!validatePassword(password)) {
+      throw new Error('Password must be at least 8 characters with uppercase, lowercase, and numbers');
     }
 
     if (sanitizedFullName.length < 2) {
@@ -235,12 +259,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Security: Clear any existing data
       clearCache();
+      clearAllStorage();
       
       await signUpWithEmail(normalizedEmail, password, sanitizedFullName, role);
       
       toast.success('Account created successfully! Please sign in.');
     } catch (error: any) {
-      // Security: Don't expose internal errors
+      // Security: Sanitized error messages
       const userFriendlyMessage = error.message?.includes('User already registered')
         ? 'An account with this email already exists'
         : error.message?.includes('network') || error.message?.includes('fetch')
@@ -253,49 +278,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Security: Complete secure sign out
-  const performSecureSignOut = async () => {
-    try {
-      // Security: Clear session timer
-      if (sessionTimer) {
-        clearInterval(sessionTimer);
-        setSessionTimer(null);
-      }
-
-      // Security: Clear user state immediately
-      setUser(null);
-      setSessionTimeRemaining(0);
-      setSessionChecked(false);
-      
-      // Security: Clear all caches
-      clearCache();
-      clearAllStorage();
-      
-      // Security: Sign out from Supabase
-      await supabaseSignOut();
-      
-    } catch (error) {
-      console.error('Sign out error:', error);
-    } finally {
-      // Security: Always clear state even if sign out fails
-      setUser(null);
-      setSessionTimeRemaining(0);
-      clearCache();
-      clearAllStorage();
-    }
-  };
-
-  const signOutHandler = async () => {
-    await performSecureSignOut();
-  };
-
-  // Security: Extend session
+  // Security: Extend session with validation
   const extendSession = useCallback(() => {
-    if (user) {
+    if (user && sessionTimeRemaining > 0) {
       setSessionTimeRemaining(60 * 60 * 1000); // Reset to 1 hour
       toast.success('Session extended for 1 hour');
     }
-  }, [user]);
+  }, [user, sessionTimeRemaining]);
 
   // Security: Cleanup on unmount
   useEffect(() => {
@@ -306,11 +295,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [sessionTimer]);
 
-  // Security: Add visibility change handler
+  // Security: Visibility change handler for session validation
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && user) {
-        // Security: Validate session when tab becomes visible
+        // Security: Re-validate session when tab becomes visible
         checkAuthState();
       }
     };
@@ -319,10 +308,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user]);
 
-  // Security: Add beforeunload handler
+  // Security: Beforeunload handler for cleanup
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Security: Clear sensitive data on page unload
       if (sessionTimer) {
         clearInterval(sessionTimer);
       }
@@ -332,6 +320,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [sessionTimer]);
 
+  // Security: Global error handler
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      if (event.error?.message?.includes('auth') || event.error?.message?.includes('session')) {
+        console.error('Global auth error:', event.error);
+        performCompleteLogout();
+      }
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    return () => window.removeEventListener('error', handleGlobalError);
+  }, []);
+
   const value = {
     user,
     loading,
@@ -339,7 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionTimeRemaining,
     signIn,
     signUp,
-    signOut: signOutHandler,
+    signOut: performCompleteLogout,
     extendSession,
   };
 
