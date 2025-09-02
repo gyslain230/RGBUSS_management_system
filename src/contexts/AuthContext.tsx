@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { signInWithEmail, signUpWithEmail, signOut as supabaseSignOut, getCurrentUser, clearCache } from '../lib/supabase';
-import { clearAllStorage, isSessionValid, loginRateLimiter, sanitizeInput, validateEmail, validatePassword } from '../utils/security';
+import { clearAllStorage, isSessionValid, loginRateLimiter, sanitizeInput, isValidEmail, validatePassword } from '../utils/security';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -161,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const normalizedEmail = email.trim().toLowerCase();
     
     // Security: Email validation
-    if (!validateEmail(normalizedEmail)) {
+    if (!isValidEmail(normalizedEmail)) {
       throw new Error('Please enter a valid email address');
     }
 
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const sanitizedFullName = sanitizeInput(fullName.trim());
 
     // Security: Enhanced validation
-    if (!validateEmail(normalizedEmail)) {
+    if (!isValidEmail(normalizedEmail)) {
       throw new Error('Please enter a valid email address');
     }
 
