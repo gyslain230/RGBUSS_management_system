@@ -163,55 +163,48 @@ export interface DailyReportStorage {
 
 export const getCurrentUser = async (): Promise<User | null> => {
   if (!isSupabaseConfigured) {
-    console.log('Supabase not configured, returning null user');
     return null;
   }
 
-  // Use cache for current user to avoid repeated calls
-  const cacheKey = 'current_user';
-  
   try {
-    return await getCachedData(cacheKey, async () => {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 5000); // Reduced timeout
-      });
-
-      const userPromise = supabase.auth.getUser();
-      const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
-      
-      if (userError || !user) {
-        return null;
-      }
-
-      const profilePromise = supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
-
-      if (profileError) {
-        if (profileError.code === 'PGRST116') {
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .insert([{
-              id: user.id,
-              email: user.email || '',
-              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-              role: 'worker'
-            }])
-            .select()
-            .single();
-          return newProfile;
-        }
-        return null;
-      }
-
-      return profile;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), 10000);
     });
+
+    const userPromise = supabase.auth.getUser();
+    const { data: { user }, error: userError } = await Promise.race([userPromise, timeoutPromise]);
+    
+    if (userError || !user) {
+      return null;
+    }
+
+    const profilePromise = supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
+
+    if (profileError) {
+      if (profileError.code === 'PGRST116') {
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .insert([{
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            role: 'worker'
+          }])
+          .select()
+          .single();
+        return newProfile;
+      }
+      return null;
+    }
+
+    return profile;
   } catch (error: any) {
-    clearCache(cacheKey);
     return null;
   }
 };

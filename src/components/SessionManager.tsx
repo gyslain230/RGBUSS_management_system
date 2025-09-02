@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function SessionManager() {
-  const { user, sessionTimeRemaining, extendSession } = useAuth();
+  const { user, sessionTimeRemaining, extendSession, loading, sessionChecked } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -31,13 +31,13 @@ export default function SessionManager() {
 
   useEffect(() => {
     // Redirect to appropriate page based on user state and current location
-    if (user) {
+    if (sessionChecked && !loading && user) {
       const authPages = ['/login', '/register'];
       if (authPages.includes(location.pathname)) {
         navigate('/dashboard', { replace: true });
       }
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, location.pathname, navigate, sessionChecked, loading]);
 
   return null; // This component doesn't render anything
 }

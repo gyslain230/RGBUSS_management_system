@@ -18,17 +18,9 @@ export default function AuthGuard({
 }: AuthGuardProps) {
   const { user, loading, sessionChecked } = useAuth();
   const location = useLocation();
-  const [isChecking, setIsChecking] = useState(true);
-
-  useEffect(() => {
-    // Wait for session to be checked before making routing decisions
-    if (sessionChecked) {
-      setIsChecking(false);
-    }
-  }, [sessionChecked]);
 
   // Show loading while checking authentication
-  if (loading || isChecking || !sessionChecked) {
+  if (loading || !sessionChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">

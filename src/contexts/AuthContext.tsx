@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0);
   const [sessionTimer, setSessionTimer] = useState<NodeJS.Timeout | null>(null);
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
+  const [authStateLoaded, setAuthStateLoaded] = useState(false);
 
   // Track if session warning has been shown to prevent spam
   const [sessionWarningShown, setSessionWarningShown] = useState(false);
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await checkAuthState();
     } finally {
       setInitialAuthCheck(true);
+      setAuthStateLoaded(true);
       setLoading(false);
     }
   };
@@ -161,17 +163,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setUser(currentUser);
         setSessionTimeRemaining(60 * 60 * 1000); // 1 hour
+        setSessionChecked(true);
       } else {
         setUser(null);
         setSessionTimeRemaining(0);
+        setSessionChecked(true);
       }
     } catch (error: any) {
       console.error('Auth state check failed:', error);
-      await performCompleteLogout();
-    } finally {
+      setUser(null);
+      setSessionTimeRemaining(0);
       setSessionChecked(true);
+      // Don't force logout on auth check failure, just clear state
     }
   };
+
+  // Security: Re-check auth state periodically for logged-in users
+  useEffect(() => {
+    if (user && authStateLoaded) {
+      const interval = setInterval(() => {
+        checkAuthState();
+      }, 5 * 60 * 1000); // Check every 5 minutes
+
+      return () => clearInterval(interval);
+    }
+  }, [user, authStateLoaded]);
 
   // Security: Enhanced sign in with comprehensive validation
   const signIn = async (email: string, password: string) => {
