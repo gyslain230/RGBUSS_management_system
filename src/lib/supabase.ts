@@ -333,10 +333,6 @@ export const signInWithEmail = async (email: string, password: string) => {
       password,
     });
 
-    console.log('Sign in response:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user });
-
-    if (error) {
-      console.error('Authentication error:', error);
     // Check if response exists
     if (!response) {
       throw new Error('No response from authentication service');
@@ -344,7 +340,10 @@ export const signInWithEmail = async (email: string, password: string) => {
 
     const { data, error } = response;
 
+    console.log('Sign in response:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user });
+
     if (error) {
+      console.error('Authentication error:', error);
       if (error.message?.includes('Invalid login credentials')) {
         throw new Error('Invalid email or password');
       } else if (error.message?.includes('Email not confirmed')) {
@@ -387,7 +386,6 @@ export const signInWithEmail = async (email: string, password: string) => {
     
     // For unexpected errors, provide a generic message
     throw new Error('Login failed due to a technical issue. Please try again.');
-    throw error;
   }
 };
 
