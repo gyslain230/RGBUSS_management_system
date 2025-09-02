@@ -70,6 +70,33 @@ export default function RegisterForm() {
 
     setLoading(true);
     try {
+      const sanitizedEmail = sanitizeInput(email.trim().toLowerCase(), 254);
+      const sanitizedFullName = sanitizeInput(fullName.trim(), 100);
+      
+      const emailValidation = validateInput.name(sanitizedEmail);
+      if (!emailValidation.isValid || !sanitizedEmail.includes('@')) {
+        logSecurityEvent('signup_invalid_email');
+        throw new Error('Please enter a valid email address');
+      }
+
+      const passwordValidation = validatePasswordStrength(password);
+      if (!passwordValidation.isValid) {
+        logSecurityEvent('signup_weak_password');
+        throw new Error(passwordValidation.errors[0] || 'Password does not meet requirements');
+      }
+
+      const nameValidation = validateInput.name(sanitizedFullName);
+      if (!nameValidation.isValid) {
+        logSecurityEvent('signup_invalid_name');
+        throw new Error(nameValidation.error || 'Invalid full name');
+      }
+
+      const roleValidation = validateInput.role(role);
+      if (!roleValidation.isValid) {
+        logSecurityEvent('signup_invalid_role');
+        throw new Error(roleValidation.error || 'Invalid role specified');
+      }
+
       await signUp(sanitizedEmail, password, sanitizedFullName, role);
       
       // Clear form data for security

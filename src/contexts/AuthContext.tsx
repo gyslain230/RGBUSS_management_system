@@ -306,7 +306,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Please enter a valid email address');
     }
 
-    if (!validatePasswordStrength(password).isValid) {
+    const passwordCheck = password.length >= 8 && 
+                         /[A-Z]/.test(password) && 
+                         /[a-z]/.test(password) && 
+                         /\d/.test(password);
+    
+    if (!passwordCheck) {
       throw new Error('Password must be at least 8 characters with uppercase, lowercase, and numbers');
     }
 
