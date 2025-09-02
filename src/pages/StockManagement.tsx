@@ -64,21 +64,21 @@ export default function StockManagement() {
   }
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8 w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Stock Management</h1>
-          <p className="text-gray-600 lg:text-lg">Manage your inventory and product listings</p>
-          <p className="text-sm lg:text-base text-green-600 mt-1">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Stock Management</h1>
+          <p className="text-sm sm:text-base text-gray-600 lg:text-lg">Manage your inventory and product listings</p>
+          <p className="text-xs sm:text-sm lg:text-base text-green-600 mt-1">
             ✅ All products are automatically approved and ready to use
           </p>
         </div>
-        <div className="flex items-center space-x-3 lg:space-x-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
           {/* Global History Button */}
           <button
             onClick={() => setShowGlobalHistory(!showGlobalHistory)}
-            className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center justify-center px-3 sm:px-4 py-2 lg:px-6 lg:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm sm:text-base"
           >
             <History className="h-4 w-4 mr-2" />
             {showGlobalHistory ? 'Hide' : 'Show'} History
@@ -87,7 +87,7 @@ export default function StockManagement() {
           {/* Add Product Button */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center justify-center px-3 sm:px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
@@ -104,7 +104,7 @@ export default function StockManagement() {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-4">
           <div className="flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -113,23 +113,22 @@ export default function StockManagement() {
                 placeholder="Search products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
           </div>
           
-          <div className="flex space-x-4">
+          <div className="flex-shrink-0">
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base w-full sm:w-auto"
             >
               <option value="all">All Categories</option>
               {categories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
-          </div>
         </div>
       </div>
 

@@ -52,8 +52,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0 sticky top-0 z-30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0 sticky top-0 z-30 w-full min-w-0">
+      <div className="w-full px-4 sm:px-6 lg:px-8 max-w-none lg:max-w-7xl lg:mx-auto">
         <div className="flex justify-between h-16 lg:h-18">
           <div className="flex items-center">
             {/* Mobile menu button */}
@@ -64,12 +64,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <Menu className="h-6 w-6" />
             </button>
             
-            <h1 className="text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white truncate">
               Business Management System
             </h1>
           </div>
 
-          <div className="flex items-center space-x-4 lg:space-x-6">
+          <div className="flex items-center space-x-2 sm:space-x-4 lg:space-x-6 flex-shrink-0">
             {user && showSessionTimer && sessionTimeRemaining > 0 && (
               <div className="hidden sm:flex items-center space-x-2">
                 <Shield className="h-4 w-4 text-orange-500" />
@@ -92,7 +92,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             <ThemeToggle />
 
-            <div className="flex items-center space-x-3 lg:space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
               <div className="flex-shrink-0">
                 <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                   <span className="text-sm lg:text-base font-medium text-blue-800 dark:text-blue-200">
@@ -100,11 +100,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   </span>
                 </div>
               </div>
-              <div className="hidden lg:block">
+              <div className="hidden sm:block">
                 <div className="text-sm lg:text-base font-medium text-gray-900 dark:text-white">{user?.full_name}</div>
-                <div className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                <div className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 flex items-center truncate max-w-32 sm:max-w-none">
                   <Mail className="h-3 w-3 mr-1" />
-                  {user?.email} • {user?.role}
+                  <span className="truncate">{user?.email}</span>
                 </div>
               </div>
               <button

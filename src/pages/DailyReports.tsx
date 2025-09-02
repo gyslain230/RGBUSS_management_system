@@ -521,7 +521,7 @@ export default function DailyReports() {
   }
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-6 lg:space-y-8 w-full min-w-0">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
           <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Daily Reports</h1>

@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure full width and prevent horizontal overflow */
+html, body, #root {
+  width: 100%;
+  min-width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Prevent layout shifts on mobile */
+* {
+  box-sizing: border-box;
+}
+
+/* Fix mobile viewport issues */
+@media (max-width: 768px) {
+  html, body, #root {
+    width: 100vw;
+    min-width: 100vw;
+    max-width: 100vw;
+  }
+  
+  /* Ensure all containers take full width */
+  .container, main, section, div[class*="max-w"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Prevent text overflow on mobile */
+  .truncate-mobile {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 :root {
   --toast-bg: #363636;
   --toast-color: #fff;

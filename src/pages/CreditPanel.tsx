@@ -86,7 +86,7 @@ export default function CreditPanel() {
   }
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-6 lg:space-y-8 w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
         <div>
