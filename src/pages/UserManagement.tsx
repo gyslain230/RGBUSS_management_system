@@ -4,6 +4,7 @@ import { getUsers, clearCache, supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/Users/AddUserModal';
+import CleanupPanel from '../components/Admin/CleanupPanel';
 
 interface UserProfile {
   id: string;
@@ -19,6 +20,7 @@ const UserManagement = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'cleanup'>('users');
 
   useEffect(() => {
     if (currentUser?.role === 'admin') {
@@ -103,25 +105,56 @@ const UserManagement = () => {
   return (
     <div className="space-y-6 dark:bg-gray-900 min-h-screen w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
+      <div className="flex flex-col space-y-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white">User Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 lg:text-lg">Manage user accounts and permissions</p>
+          <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white">Administration</h1>
+          <p className="text-gray-600 dark:text-gray-400 lg:text-lg">Manage users, permissions, and system maintenance</p>
           <p className="text-sm lg:text-base text-blue-600 dark:text-blue-400 mt-1">
             📧 Users authenticate with email addresses and passwords
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </button>
+        
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'users'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            User Management
+          </button>
+          <button
+            onClick={() => setActiveTab('cleanup')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'cleanup'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Database Cleanup
+          </button>
+        </div>
+        
+        {/* Add User Button - only show on users tab */}
+        {activeTab === 'users' && (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add User
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      {/* Tab Content */}
+      {activeTab === 'users' && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <Users className="h-5 w-5 text-blue-600 mr-2" />
@@ -211,6 +244,11 @@ const UserManagement = () => {
           </div>
         )}
       </div>
+      )}
+      
+      {activeTab === 'cleanup' && (
+        <CleanupPanel />
+      )}
 
       {/* Add User Modal */}
       {showAddModal && (

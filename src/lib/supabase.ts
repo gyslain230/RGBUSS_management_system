@@ -649,3 +649,39 @@ export const getDailyReportForDate = async (date: string) => {
 };
 
 export const isSupabaseReady = () => isSupabaseConfigured;
+
+// Cleanup functions for old records
+export const runManualCleanup = async () => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase not configured');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('run_weekly_cleanup');
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getCleanupLogs = async (limit: number = 50) => {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('cleanup_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching cleanup logs:', error);
+    return [];
+  }
+};
