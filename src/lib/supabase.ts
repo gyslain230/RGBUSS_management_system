@@ -513,25 +513,6 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
       throw new Error('User creation failed - no user returned from authentication');
     }
 
-    // If user needs email confirmation, confirm them automatically
-    if (!authData.user.email_confirmed_at && authData.user.id) {
-      try {
-        // Use service role to confirm the user automatically
-        const { error: confirmError } = await supabase.auth.admin.updateUserById(
-          authData.user.id,
-          { email_confirm: true }
-        );
-        
-        if (confirmError) {
-          console.warn('Auto-confirmation failed:', confirmError.message);
-          // Continue anyway - user can be confirmed later
-        }
-      } catch (confirmError) {
-        console.warn('Auto-confirmation error:', confirmError);
-        // Continue anyway - user can be confirmed later
-      }
-    }
-
     // Wait a moment for the user to be fully created
     await new Promise(resolve => setTimeout(resolve, 1000));
 
