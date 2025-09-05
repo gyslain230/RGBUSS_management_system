@@ -49,6 +49,28 @@ export const generateAndStoreDailyReportPDF = async (
       throw new Error('User authentication required');
     }
 
+    // Check if bucket exists, if not try to create it
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.warn('Could not check buckets:', bucketsError.message);
+    }
+    
+    const bucketExists = buckets?.some(bucket => bucket.id === 'daily-report-pdfs');
+    
+    if (!bucketExists) {
+      // Try to create the bucket
+      const { error: createBucketError } = await supabase.storage.createBucket('daily-report-pdfs', {
+        public: false,
+        fileSizeLimit: 10485760, // 10MB
+        allowedMimeTypes: ['application/pdf']
+      });
+      
+      if (createBucketError) {
+        throw new Error(`Storage bucket 'daily-report-pdfs' does not exist and could not be created. Please ensure the migration has been applied to your Supabase database. Error: ${createBucketError.message}`);
+      }
+    }
+
     // Generate PDF
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.width;
