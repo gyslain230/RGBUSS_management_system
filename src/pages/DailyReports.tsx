@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, RefreshCw, Package, AlertCircle, CreditCard, Database, Clock, Save, Archive, Eye } from 'lucide-react';
+import { FileText, Download, Calendar, RefreshCw, Package, AlertCircle, CreditCard, Database, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, DailyReportStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
-import { 
-  generateAndStorePDFReport, 
-  getStoredPDFReports, 
-  getPDFDownloadURL, 
-  convertPDFToTableData,
-  PDFReportMetadata,
-  DailyReportData as PDFDailyReportData,
-  CreditData as PDFCreditData
-} from '../lib/pdfReportStorage';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
@@ -49,14 +41,6 @@ export default function DailyReports() {
   const [adjustmentsFound, setAdjustmentsFound] = useState(0);
   const [hasReportData, setHasReportData] = useState(false);
   const [useStoredData, setUseStoredData] = useState(false);
-  const [storedPDFs, setStoredPDFs] = useState<PDFReportMetadata[]>([]);
-  const [showStoredReports, setShowStoredReports] = useState(false);
-  const [loadingPDF, setLoadingPDF] = useState(false);
-  const [viewingPDFData, setViewingPDFData] = useState<{
-    reportData: DailyReportData[];
-    creditsData: any[];
-    metadata: PDFReportMetadata;
-  } | null>(null);
 
   // Security: Validate user permissions
   useEffect(() => {
@@ -68,17 +52,7 @@ export default function DailyReports() {
 
   useEffect(() => {
     fetchReportData();
-    fetchStoredPDFs();
   }, [selectedDate]);
-
-  const fetchStoredPDFs = async () => {
-    try {
-      const pdfs = await getStoredPDFReports();
-      setStoredPDFs(pdfs);
-    } catch (error) {
-      console.error('Error fetching stored PDFs:', error);
-    }
-  };
 
   const getPreviousDayStock = async (productId: string, currentDate: string) => {
     try {
@@ -309,111 +283,6 @@ export default function DailyReports() {
     }
   };
 
-  const handleGenerateAndStorePDF = async () => {
-    if (!hasReportData || (reportData.length === 0 && creditsData.length === 0 && adjustmentsFound === 0)) {
-      toast.error(`No daily report data found for ${format(new Date(selectedDate), 'MMMM dd, yyyy')}. Please select a date with stock adjustments or credits.`);
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error('Authentication required for PDF generation');
-      return;
-    }
-
-    setLoadingPDF(true);
-    try {
-      // Convert data to the format expected by the PDF generator
-      const pdfReportData: PDFDailyReportData[] = reportData.map(item => ({
-        no: item.no,
-        libelle: item.libelle,
-        stock: item.stock,
-        entres: item.entres,
-        totalJour: item.totalJour,
-        solde: item.solde,
-        sortie: item.sortie,
-        pUnit1: item.pUnit1,
-        pTotal: item.pTotal,
-        amavide: item.amavide,
-        productId: item.productId
-      }));
-
-      const pdfCreditsData: PDFCreditData[] = creditsData.map(credit => ({
-        id: credit.id,
-        customer_name: credit.customer_name,
-        amount: credit.amount,
-        product_name: credit.product_name || 'N/A',
-        created_at: credit.created_at
-      }));
-
-      const result = await generateAndStorePDFReport(
-        pdfReportData,
-        pdfCreditsData,
-        selectedDate,
-        user,
-        useStoredData
-      );
-
-      if (result.success) {
-        toast.success('Daily report PDF generated and stored successfully!');
-        await fetchStoredPDFs(); // Refresh stored PDFs list
-      } else {
-        toast.error(result.error || 'Failed to generate and store PDF');
-      }
-    } catch (error) {
-      toast.error('Error generating PDF report');
-    } finally {
-      setLoadingPDF(false);
-    }
-  };
-
-  const handleViewStoredPDF = async (pdfMetadata: PDFReportMetadata) => {
-    setLoadingPDF(true);
-    try {
-      const tableData = await convertPDFToTableData(pdfMetadata);
-      
-      if (tableData) {
-        setViewingPDFData({
-          reportData: tableData.reportData,
-          creditsData: tableData.creditsData,
-          metadata: pdfMetadata
-        });
-        setShowStoredReports(false);
-        toast.success('PDF data loaded successfully!');
-      } else {
-        toast.error('Failed to convert PDF to table data');
-      }
-    } catch (error) {
-      toast.error('Error loading PDF data');
-    } finally {
-      setLoadingPDF(false);
-    }
-  };
-
-  const handleDownloadStoredPDF = async (pdfMetadata: PDFReportMetadata) => {
-    try {
-      const downloadURL = await getPDFDownloadURL(pdfMetadata.pdf_path);
-      
-      if (downloadURL) {
-        const link = document.createElement('a');
-        link.href = downloadURL;
-        link.download = pdfMetadata.file_name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('PDF download started!');
-      } else {
-        toast.error('Failed to generate download link');
-      }
-    } catch (error) {
-      toast.error('Error downloading PDF');
-    }
-  };
-
-  const handleBackToLive = () => {
-    setViewingPDFData(null);
-    fetchReportData();
-  };
-
   const handleExportReport = () => {
     if (!hasReportData || (reportData.length === 0 && creditsData.length === 0 && adjustmentsFound === 0)) {
       toast.error(`No daily report data found for ${format(new Date(selectedDate), 'MMMM dd, yyyy')}. Please select a date with stock adjustments or credits.`);
@@ -427,7 +296,7 @@ export default function DailyReports() {
     }
 
     try {
-      const doc = new jsPDF('portrait', 'mm', 'a4');
+      const doc = new (jsPDF as any)('portrait', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       
@@ -443,71 +312,23 @@ export default function DailyReports() {
       doc.text(`DATE: ${format(new Date(selectedDate), 'dd/MM/yyyy')}`, 20, 36);
       doc.text(`Source: ${useStoredData ? 'Stored Database Report' : 'Live Generated Report'}`, 20, 42);
 
-      const startY = 50;
-      const rowHeight = 6;
-      const colWidths = [12, 45, 15, 15, 20, 15, 15, 18, 18, 15];
-      let currentX = 20;
+      // Use autoTable for better formatting
+      const tableData = reportData.map(item => [
+        item.no.toString(),
+        item.libelle.substring(0, 20),
+        item.stock.toString(),
+        item.entres.toString(),
+        item.totalJour.toString(),
+        item.solde.toString(),
+        item.sortie.toString(),
+        item.pUnit1.toFixed(0),
+        item.pTotal.toFixed(0),
+        item.amavide.toString()
+      ]);
 
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.rect(20, startY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
-      
-      const headers = ['No', 'LIBELLE', 'Stock', 'Entres', 'Total/Jour', 'Solde', 'Sortie', 'P.Unit 1', 'P.Total', 'Amavide'];
-      
-      currentX = 20;
-      headers.forEach((header, index) => {
-        if (index > 0) {
-          doc.line(currentX, startY, currentX, startY + rowHeight);
-        }
-        doc.text(header, currentX + 2, startY + 4);
-        currentX += colWidths[index];
-      });
-      doc.line(currentX, startY, currentX, startY + rowHeight);
-
-      doc.setFont('helvetica', 'normal');
-      let currentY = startY + rowHeight;
-      
-      reportData.forEach((item) => {
-        doc.rect(20, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
-        
-        currentX = 20;
-        const rowData = [
-          item.no.toString(),
-          item.libelle.substring(0, 20),
-          item.stock.toString(),
-          item.entres.toString(),
-          item.totalJour.toString(),
-          item.solde.toString(),
-          item.sortie.toString(),
-          item.pUnit1.toFixed(0),
-          item.pTotal.toFixed(0),
-          item.amavide.toString()
-        ];
-        
-        rowData.forEach((data, colIndex) => {
-          if (colIndex > 0) {
-            doc.line(currentX, currentY, currentX, currentY + rowHeight);
-          }
-          
-          const isNumber = colIndex > 1;
-          if (isNumber) {
-            doc.text(data, currentX + colWidths[colIndex] - 2, currentY + 4, { align: 'right' });
-          } else {
-            doc.text(data, currentX + 2, currentY + 4);
-          }
-          currentX += colWidths[colIndex];
-        });
-        
-        doc.line(currentX, currentY, currentX, currentY + rowHeight);
-        currentY += rowHeight;
-      });
-
+      // Add totals row
       const totals = calculateTotals();
-      doc.setFont('helvetica', 'bold');
-      doc.rect(20, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
-      
-      currentX = 20;
-      const totalRowData = [
+      tableData.push([
         'TOTAL',
         '',
         totals.totalStock.toString(),
@@ -518,99 +339,90 @@ export default function DailyReports() {
         '',
         totals.totalPTotal.toFixed(0),
         totals.totalAmavide.toString()
-      ];
-      
-      totalRowData.forEach((data, colIndex) => {
-        if (colIndex > 0) {
-          doc.line(currentX, currentY, currentX, currentY + rowHeight);
-        }
-        
-        if (data) {
-          const isNumber = colIndex > 1 && colIndex !== 7;
-          if (isNumber) {
-            doc.text(data, currentX + colWidths[colIndex] - 2, currentY + 4, { align: 'right' });
-          } else {
-            doc.text(data, currentX + 2, currentY + 4);
+      ]);
+
+      doc.autoTable({
+        head: [['No', 'LIBELLE', 'Stock', 'Entres', 'Total/Jour', 'Solde', 'Sortie', 'P.Unit 1', 'P.Total', 'Amavide']],
+        body: tableData,
+        startY: 50,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold'
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 12 },
+          1: { halign: 'left', cellWidth: 45 },
+          2: { halign: 'right', cellWidth: 15 },
+          3: { halign: 'right', cellWidth: 15 },
+          4: { halign: 'right', cellWidth: 20 },
+          5: { halign: 'right', cellWidth: 15 },
+          6: { halign: 'right', cellWidth: 15 },
+          7: { halign: 'right', cellWidth: 18 },
+          8: { halign: 'right', cellWidth: 18 },
+          9: { halign: 'right', cellWidth: 15 }
+        },
+        didParseCell: function(data) {
+          // Make the total row bold
+          if (data.row.index === tableData.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [250, 250, 250];
           }
         }
-        currentX += colWidths[colIndex];
       });
-      
-      doc.line(currentX, currentY, currentX, currentY + rowHeight);
-      currentY += rowHeight + 10;
 
+      // Credits section
       if (creditsData.length > 0) {
+        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.text('2.(DETTE NOM ET PRENOM + MONTANT)', 20, currentY);
-        currentY += 8;
+        doc.text('2.(DETTE NOM ET PRENOM + MONTANT)', 20, finalY);
 
-        const creditColWidths = [15, 60, 25];
-        const creditHeaders = ['No', 'NOM ET PRENOM', 'MONTANT'];
-        
-        doc.setFontSize(8);
-        doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
-        currentX = 20;
-        
-        creditHeaders.forEach((header, index) => {
-          if (index > 0) {
-            doc.line(currentX, currentY, currentX, currentY + rowHeight);
-          }
-          doc.text(header, currentX + 2, currentY + 4);
-          currentX += creditColWidths[index];
-        });
-        doc.line(currentX, currentY, currentX, currentY + rowHeight);
-        currentY += rowHeight;
+        const creditsTableData = creditsData.map((credit, index) => [
+          (index + 1).toString(),
+          credit.customer_name.substring(0, 25),
+          Number(credit.amount).toFixed(0)
+        ]);
 
-        doc.setFont('helvetica', 'normal');
-        creditsData.forEach((credit, index) => {
-          doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
-          
-          currentX = 20;
-          const creditRowData = [
-            (index + 1).toString(),
-            credit.customer_name.substring(0, 25),
-            Number(credit.amount).toFixed(0)
-          ];
-          
-          creditRowData.forEach((data, colIndex) => {
-            if (colIndex > 0) {
-              doc.line(currentX, currentY, currentX, currentY + rowHeight);
-            }
-            
-            if (colIndex === 2) {
-              doc.text(data, currentX + creditColWidths[colIndex] - 2, currentY + 4, { align: 'right' });
-            } else {
-              doc.text(data, currentX + 2, currentY + 4);
-            }
-            currentX += creditColWidths[colIndex];
-          });
-          doc.line(currentX, currentY, currentX, currentY + rowHeight);
-          currentY += rowHeight;
-        });
-
-        doc.setFont('helvetica', 'bold');
+        // Add credits total
         const totalCreditAmount = creditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
-        doc.rect(20, currentY, creditColWidths.reduce((a, b) => a + b, 0), rowHeight);
-        
-        currentX = 20;
-        const creditTotalData = ['TOTAL', '', totalCreditAmount.toFixed(0)];
-        
-        creditTotalData.forEach((data, colIndex) => {
-          if (colIndex > 0) {
-            doc.line(currentX, currentY, currentX, currentY + rowHeight);
-          }
-          
-          if (data) {
-            if (colIndex === 2) {
-              doc.text(data, currentX + creditColWidths[colIndex] - 2, currentY + 4, { align: 'right' });
-            } else {
-              doc.text(data, currentX + 2, currentY + 4);
+        creditsTableData.push([
+          'TOTAL',
+          '',
+          totalCreditAmount.toFixed(0)
+        ]);
+
+        doc.autoTable({
+          head: [['No', 'NOM ET PRENOM', 'MONTANT']],
+          body: creditsTableData,
+          startY: finalY + 5,
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+          },
+          headStyles: {
+            fillColor: [240, 240, 240],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold'
+          },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 15 },
+            1: { halign: 'left', cellWidth: 60 },
+            2: { halign: 'right', cellWidth: 25 }
+          },
+          didParseCell: function(data) {
+            // Make the total row bold
+            if (data.row.index === creditsTableData.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [250, 250, 250];
             }
           }
-          currentX += creditColWidths[colIndex];
         });
-        doc.line(currentX, currentY, currentX, currentY + rowHeight);
       }
 
       const footerY = pageHeight - 30;
@@ -643,11 +455,6 @@ export default function DailyReports() {
   };
 
   const totals = calculateTotals();
-
-  // Use PDF data if viewing stored PDF, otherwise use live data
-  const displayReportData = viewingPDFData ? viewingPDFData.reportData : reportData;
-  const displayCreditsData = viewingPDFData ? viewingPDFData.creditsData : creditsData;
-  const displayTotals = viewingPDFData ? calculateTotals(viewingPDFData.reportData) : totals;
 
   if (loading) {
     return (
@@ -688,24 +495,6 @@ export default function DailyReports() {
             />
           </div>
 
-          <button
-            onClick={() => setShowStoredReports(!showStoredReports)}
-            className="inline-flex items-center px-3 py-2 lg:px-4 lg:py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <Archive className="h-4 w-4 mr-2" />
-            {showStoredReports ? 'Hide' : 'View'} Stored PDFs ({storedPDFs.length})
-          </button>
-
-          {viewingPDFData && (
-            <button
-              onClick={handleBackToLive}
-              className="inline-flex items-center px-3 py-2 lg:px-4 lg:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Back to Live Data
-            </button>
-          )}
-
           {!useStoredData && (
             <button
               onClick={handleGenerateAndStore}
@@ -714,17 +503,6 @@ export default function DailyReports() {
             >
               <Database className={`h-4 w-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
               {generating ? 'Storing...' : 'Generate & Store'}
-            </button>
-          )}
-
-          {!viewingPDFData && (
-            <button
-              onClick={handleGenerateAndStorePDF}
-              disabled={loadingPDF}
-              className="inline-flex items-center px-3 py-2 lg:px-4 lg:py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
-            >
-              <Save className={`h-4 w-4 mr-2 ${loadingPDF ? 'animate-spin' : ''}`} />
-              {loadingPDF ? 'Generating PDF...' : 'Generate & Store PDF'}
             </button>
           )}
 
@@ -746,112 +524,6 @@ export default function DailyReports() {
           </button>
         </div>
       </div>
-
-      {/* Stored PDFs List */}
-      {showStoredReports && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-purple-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Stored PDF Reports</h2>
-                <p className="text-sm text-gray-600">{storedPDFs.length} PDF reports available</p>
-              </div>
-              <Archive className="h-6 w-6 text-purple-600" />
-            </div>
-          </div>
-
-          {storedPDFs.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Archive className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p>No stored PDF reports found</p>
-              <p className="text-sm text-gray-400 mt-2">Generate and store reports to see them here</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Report Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      File Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      File Size
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {storedPDFs.map((pdf) => (
-                    <tr key={pdf.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {format(new Date(pdf.report_date), 'EEEE, MMMM do, yyyy')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {pdf.file_name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {(pdf.file_size / 1024).toFixed(1)} KB
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {format(new Date(pdf.created_at), 'MMM dd, yyyy HH:mm')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        <button
-                          onClick={() => handleViewStoredPDF(pdf)}
-                          disabled={loadingPDF}
-                          className="text-blue-600 hover:text-blue-900 transition-colors disabled:opacity-50"
-                        >
-                          <Eye className="h-4 w-4 inline mr-1" />
-                          View Table
-                        </button>
-                        <button
-                          onClick={() => handleDownloadStoredPDF(pdf)}
-                          className="text-green-600 hover:text-green-900 transition-colors"
-                        >
-                          <Download className="h-4 w-4 inline mr-1" />
-                          Download PDF
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* PDF Viewing Indicator */}
-      {viewingPDFData && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex">
-            <Archive className="h-5 w-5 text-purple-400 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-purple-800">
-                Viewing Stored PDF Report
-              </h3>
-              <div className="mt-2 text-sm text-purple-700">
-                <p>
-                  You are viewing data from a stored PDF report for <strong>{format(new Date(viewingPDFData.metadata.report_date), 'MMMM dd, yyyy')}</strong>.
-                </p>
-                <p className="mt-1">
-                  Generated on: {format(new Date(viewingPDFData.metadata.created_at), 'MMM dd, yyyy HH:mm')} • 
-                  File: {viewingPDFData.metadata.file_name} • 
-                  Size: {(viewingPDFData.metadata.file_size / 1024).toFixed(1)} KB
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className={`p-4 rounded-lg border ${
         useStoredData 
@@ -929,21 +601,21 @@ export default function DailyReports() {
         <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Stock</p>
           <p className="text-2xl lg:text-3xl font-bold text-blue-600">
-            {displayTotals.totalStock}
+            {totals.totalStock}
           </p>
           {isFirstDay && <p className="text-xs text-blue-500">First day - all 0</p>}
         </div>
         <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Entres</p>
           <p className="text-2xl lg:text-3xl font-bold text-green-600">
-            {displayTotals.totalEntres}
+            {totals.totalEntres}
           </p>
           <p className="text-xs text-green-500">New products + adjustments</p>
         </div>
         <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Revenue</p>
           <p className="text-2xl lg:text-3xl font-bold text-green-600">
-            ${displayTotals.totalPTotal.toFixed(2)}
+            ${totals.totalPTotal.toFixed(2)}
           </p>
         </div>
       </div>
@@ -955,21 +627,19 @@ export default function DailyReports() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
-                    Daily Report - {format(new Date(viewingPDFData ? viewingPDFData.metadata.report_date : selectedDate), 'EEEE, MMMM do, yyyy')}
-                    {viewingPDFData && <span className="text-purple-600 ml-2">(From Stored PDF)</span>}
+                    Daily Report - {format(new Date(selectedDate), 'EEEE, MMMM do, yyyy')}
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Generated by {user?.full_name} • {displayReportData.length} products
-                    {viewingPDFData && <span className="text-purple-600 ml-2">• PDF Report</span>}
-                    {!viewingPDFData && useStoredData && <span className="text-green-600 ml-2">• Stored Report</span>}
-                    {!viewingPDFData && !useStoredData && <span className="text-blue-600 ml-2">• Live Report</span>}
+                    Generated by {user?.full_name} • {reportData.length} products
+                    {useStoredData && <span className="text-green-600 ml-2">• Stored Report</span>}
+                    {!useStoredData && <span className="text-blue-600 ml-2">• Live Report</span>}
                   </p>
                 </div>
                 <FileText className="h-6 w-6 text-blue-600" />
               </div>
             </div>
 
-            {displayReportData.length === 0 ? (
+            {reportData.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p>No products found for the selected date</p>
@@ -1017,7 +687,7 @@ export default function DailyReports() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {displayReportData.map((item, index) => (
+                    {reportData.map((item, index) => (
                       <tr key={item.productId} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200">
                           {item.no}
@@ -1072,33 +742,33 @@ export default function DailyReports() {
                         Total
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                        {displayReportData.length} Products
+                        {reportData.length} Products
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                         <span className={isFirstDay ? 'text-blue-600' : ''}>
-                          {displayTotals.totalStock}
+                          {totals.totalStock}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-green-600 border-r border-gray-200">
-                        {displayTotals.totalEntres}
+                        {totals.totalEntres}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                        {displayTotals.totalJour}
+                        {totals.totalJour}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                        {displayTotals.totalSolde}
+                        {totals.totalSolde}
                       </td>
                       <td className="px-4 py-3 text-sm text-red-600 border-r border-gray-200">
-                        {displayTotals.totalSortie}
+                        {totals.totalSortie}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                         -
                       </td>
                       <td className="px-4 py-3 text-sm text-green-600 border-r border-gray-200">
-                        ${displayTotals.totalPTotal.toFixed(2)}
+                        ${totals.totalPTotal.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {displayTotals.totalAmavide}
+                        {totals.totalAmavide}
                       </td>
                     </tr>
                   </tfoot>
@@ -1115,17 +785,16 @@ export default function DailyReports() {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
                     2. (DETTE NOM ET PRENOM + MONTANT)
-                    {viewingPDFData && <span className="text-purple-600 ml-2">(From PDF)</span>}
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Credits issued on {format(new Date(viewingPDFData ? viewingPDFData.metadata.report_date : selectedDate), 'MMM dd, yyyy')}
+                    Credits issued on {format(new Date(selectedDate), 'MMM dd, yyyy')}
                   </p>
                 </div>
                 <CreditCard className="h-6 w-6 text-orange-600" />
               </div>
             </div>
 
-            {displayCreditsData.length === 0 ? (
+            {creditsData.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p>No credits found for this date</p>
@@ -1148,7 +817,7 @@ export default function DailyReports() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {displayCreditsData.map((credit, index) => (
+                    {creditsData.map((credit, index) => (
                       <tr key={credit.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           {index + 1}
@@ -1169,10 +838,10 @@ export default function DailyReports() {
                         Total
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {displayCreditsData.length} Credits
+                        {creditsData.length} Credits
                       </td>
                       <td className="px-4 py-3 text-sm text-orange-600">
-                        ${displayCreditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0).toFixed(2)}
+                        ${creditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0).toFixed(2)}
                       </td>
                     </tr>
                   </tfoot>
