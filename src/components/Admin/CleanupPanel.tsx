@@ -124,7 +124,7 @@ export default function CleanupPanel() {
             <h3 className="text-sm font-medium text-green-800">Daily Reports Cleanup</h3>
           </div>
           <p className="text-sm text-green-700 mt-2">
-            Automatically deletes daily reports that are older than 6 months.
+            Automatically deletes daily reports that are older than 5 months.
             Recent reports are preserved for business analysis and compliance.
           </p>
         </div>
