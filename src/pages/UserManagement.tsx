@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Trash2, Shield, Mail } from 'lucide-react';
-import { getUsers, clearCache, supabase, getSystemUsersStatus, User } from '../lib/supabase';
+import { getUsers, clearCache, supabase, getSystemUsersStatus } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import AddUserModal from '../components/Users/AddUserModal';
 import CleanupPanel from '../components/Admin/CleanupPanel';
 
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'manager' | 'worker';
+  created_at: string;
+  updated_at: string;
+}
+
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [systemStatus, setSystemStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
