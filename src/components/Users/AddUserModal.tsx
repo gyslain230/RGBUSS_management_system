@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { clearCache } from '../../lib/supabase';
+import { clearCache, getSystemUsersStatus, canAddUserWithRole } from '../../lib/supabase';
 import { logSecurityEvent } from '../../utils/security';
 import toast from 'react-hot-toast';
 
@@ -23,6 +23,8 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
   const { signUp } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   
   const { register, handleSubmit, formState: { errors }, reset } = useForm<UserFormData>({
     defaultValues: {
@@ -30,7 +32,31 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     }
   });
 
+  // Fetch system status when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchSystemStatus();
+    }
+  }, [isOpen]);
+
+  const fetchSystemStatus = async () => {
+    try {
+      const status = await getSystemUsersStatus();
+      setSystemStatus(status);
+      setAvailableRoles(status.missing_roles || []);
+    } catch (error) {
+      console.error('Error fetching system status:', error);
+    }
+  };
+
   const onSubmit = async (data: UserFormData) => {
+    // Check if we can add this role
+    const canAdd = await canAddUserWithRole(data.role);
+    if (!canAdd) {
+      setError(`Cannot add ${data.role}: role already exists or maximum users (3) reached`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -145,12 +171,23 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
               disabled={loading}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
             >
-              <option value="worker">Worker</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
+              {availableRoles.length > 0 ? (
+                availableRoles.map(role => (
+                  <option key={role} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>No roles available</option>
+              )}
             </select>
             {errors.role && (
               <p className="text-red-500 text-sm mt-1">{errors.role.message}</p>
+            )}
+            {availableRoles.length === 0 && (
+              <p className="text-orange-500 text-sm mt-1">
+                All roles are filled. Maximum 3 users allowed.
+              </p>
             )}
           </div>
 
@@ -187,7 +224,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || availableRoles.length === 0}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {loading ? (
@@ -202,15 +239,32 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
           </div>
         </form>
 
-        {/* Information about email authentication */}
-        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+        {/* System Status Information */}
+        {systemStatus && (
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="text-sm text-blue-700">
+              <p className="font-medium mb-1">👥 System Users Status</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>Total Users: {systemStatus.total_users}/3</div>
+                <div>Remaining Slots: {systemStatus.remaining_slots}</div>
+                <div>Admin: {systemStatus.admin_count ? '✅' : '❌'}</div>
+                <div>Manager: {systemStatus.manager_count ? '✅' : '❌'}</div>
+                <div>Worker: {systemStatus.worker_count ? '✅' : '❌'}</div>
+                <div>Available Roles: {availableRoles.join(', ') || 'None'}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Information about the three-user system */}
+        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
           <div className="text-sm text-blue-700">
-            <p className="font-medium mb-1">📧 Email Authentication</p>
+            <p className="font-medium mb-1">🔒 Three User System</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
-              <li>Users will sign in using their email address and password</li>
-              <li>Email address must be valid and unique</li>
-              <li>Password must be at least 6 characters long</li>
-              <li>User profile will be created automatically</li>
+              <li>System supports exactly 3 users: Admin, Manager, Worker</li>
+              <li>Each role can only exist once in the system</li>
+              <li>Admin can add missing roles until all 3 slots are filled</li>
+              <li>Users are automatically verified without email confirmation</li>
             </ul>
           </div>
         </div>

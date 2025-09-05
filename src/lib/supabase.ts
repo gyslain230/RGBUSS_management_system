@@ -271,6 +271,59 @@ export const getUsers = async () => {
   });
 };
 
+// Get system users status (total users, missing roles, etc.)
+export const getSystemUsersStatus = async () => {
+  if (!isSupabaseConfigured) {
+    return {
+      total_users: 0,
+      admin_count: 0,
+      manager_count: 0,
+      worker_count: 0,
+      remaining_slots: 3,
+      missing_roles: ['admin', 'manager', 'worker']
+    };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('system_users_status')
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching system users status:', error);
+    return {
+      total_users: 0,
+      admin_count: 0,
+      manager_count: 0,
+      worker_count: 0,
+      remaining_slots: 3,
+      missing_roles: ['admin', 'manager', 'worker']
+    };
+  }
+};
+
+// Check if a role can be added
+export const canAddUserWithRole = async (role: string) => {
+  if (!isSupabaseConfigured) {
+    return false;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('can_add_user_with_role', {
+      target_role: role
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error checking if role can be added:', error);
+    return false;
+  }
+};
+
 // Optimized function to get stock adjustments with caching
 export const getStockAdjustments = async (productId?: string) => {
   if (!isSupabaseConfigured) {
