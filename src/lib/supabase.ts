@@ -238,21 +238,19 @@ export const getCredits = async (userId?: string) => {
     return [];
   }
 
-  const cacheKey = `credits_${userId || 'all'}`;
-  return await getCachedData(cacheKey, async () => {
-    let query = supabase
-      .from('credits')
-      .select('id, customer_name, amount, product_name, status, due_date, created_at')
-      .order('created_at', { ascending: false });
+  // Don't use cache for credits to ensure real-time updates
+  let query = supabase
+    .from('credits')
+    .select('id, customer_name, amount, product_name, status, due_date, created_at')
+    .order('created_at', { ascending: false });
 
-    if (userId) {
-      query = query.eq('issued_by', userId);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  });
+  if (userId) {
+    query = query.eq('issued_by', userId);
+  }
+  
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
 };
 
 // Optimized function to get users with caching

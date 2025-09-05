@@ -54,6 +54,8 @@ export default function CreditPanel() {
       if (error) throw error;
 
       toast.success('Credit marked as paid');
+      // Clear cache to ensure fresh data
+      clearCache();
       fetchCredits();
     } catch (error) {
       toast.error('Error updating credit status');

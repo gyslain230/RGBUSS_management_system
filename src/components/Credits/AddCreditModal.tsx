@@ -121,6 +121,9 @@ export default function AddCreditModal({ isOpen, onClose, onSuccess }: AddCredit
         customer_name: sanitizedData.customer_name,
         amount: sanitizedData.amount 
       });
+      
+      // Clear cache to ensure fresh data
+      clearCache();
       reset();
       setSelectedProduct(null);
       onSuccess();
