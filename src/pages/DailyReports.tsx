@@ -3,12 +3,14 @@ import { FileText, Download, Calendar, RefreshCw, Package, AlertCircle, CreditCa
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, DailyReportStorage, generateDailyReport, getDailyReportForDate, clearCache } from '../lib/supabase';
 import { 
-  generateAndStoreDailyReportPDF, 
+  generateAndStorePDFReport, 
   getStoredPDFReports, 
   getPDFDownloadURL, 
   convertPDFToTableData,
-  PDFMetadata 
-} from '../lib/pdfStorage';
+  PDFReportMetadata,
+  DailyReportData as PDFDailyReportData,
+  CreditData as PDFCreditData
+} from '../lib/pdfReportStorage';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -47,13 +49,13 @@ export default function DailyReports() {
   const [adjustmentsFound, setAdjustmentsFound] = useState(0);
   const [hasReportData, setHasReportData] = useState(false);
   const [useStoredData, setUseStoredData] = useState(false);
-  const [storedPDFs, setStoredPDFs] = useState<PDFMetadata[]>([]);
+  const [storedPDFs, setStoredPDFs] = useState<PDFReportMetadata[]>([]);
   const [showStoredReports, setShowStoredReports] = useState(false);
   const [loadingPDF, setLoadingPDF] = useState(false);
   const [viewingPDFData, setViewingPDFData] = useState<{
     reportData: DailyReportData[];
     creditsData: any[];
-    metadata: PDFMetadata;
+    metadata: PDFReportMetadata;
   } | null>(null);
 
   // Security: Validate user permissions
@@ -320,9 +322,32 @@ export default function DailyReports() {
 
     setLoadingPDF(true);
     try {
-      const result = await generateAndStoreDailyReportPDF(
-        reportData,
-        creditsData,
+      // Convert data to the format expected by the PDF generator
+      const pdfReportData: PDFDailyReportData[] = reportData.map(item => ({
+        no: item.no,
+        libelle: item.libelle,
+        stock: item.stock,
+        entres: item.entres,
+        totalJour: item.totalJour,
+        solde: item.solde,
+        sortie: item.sortie,
+        pUnit1: item.pUnit1,
+        pTotal: item.pTotal,
+        amavide: item.amavide,
+        productId: item.productId
+      }));
+
+      const pdfCreditsData: PDFCreditData[] = creditsData.map(credit => ({
+        id: credit.id,
+        customer_name: credit.customer_name,
+        amount: credit.amount,
+        product_name: credit.product_name || 'N/A',
+        created_at: credit.created_at
+      }));
+
+      const result = await generateAndStorePDFReport(
+        pdfReportData,
+        pdfCreditsData,
         selectedDate,
         user,
         useStoredData
@@ -341,7 +366,7 @@ export default function DailyReports() {
     }
   };
 
-  const handleViewStoredPDF = async (pdfMetadata: PDFMetadata) => {
+  const handleViewStoredPDF = async (pdfMetadata: PDFReportMetadata) => {
     setLoadingPDF(true);
     try {
       const tableData = await convertPDFToTableData(pdfMetadata);
@@ -364,7 +389,7 @@ export default function DailyReports() {
     }
   };
 
-  const handleDownloadStoredPDF = async (pdfMetadata: PDFMetadata) => {
+  const handleDownloadStoredPDF = async (pdfMetadata: PDFReportMetadata) => {
     try {
       const downloadURL = await getPDFDownloadURL(pdfMetadata.pdf_path);
       

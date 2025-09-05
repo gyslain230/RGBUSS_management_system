@@ -1,0 +1,460 @@
+import { supabase } from './supabase';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { format } from 'date-fns';
+
+// Extend jsPDF type to include autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
+
+export interface DailyReportData {
+  no: number;
+  libelle: string;
+  stock: number;
+  entres: number;
+  totalJour: number;
+  solde: number;
+  sortie: number;
+  pUnit1: number;
+  pTotal: number;
+  amavide: number;
+  productId: string;
+}
+
+export interface CreditData {
+  id: string;
+  customer_name: string;
+  amount: number;
+  product_name: string;
+  created_at: string;
+}
+
+export interface PDFReportMetadata {
+  id: string;
+  report_date: string;
+  pdf_path: string;
+  file_name: string;
+  file_size: number;
+  report_data: DailyReportData[];
+  credits_data: CreditData[];
+  summary_data: any;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  metadata: any;
+}
+
+export interface PDFGenerationResult {
+  success: boolean;
+  pdfPath?: string;
+  metadata?: PDFReportMetadata;
+  error?: string;
+}
+
+/**
+ * Generate PDF from daily report data and store in Supabase Storage with structured data
+ */
+export const generateAndStorePDFReport = async (
+  reportData: DailyReportData[],
+  creditsData: CreditData[],
+  selectedDate: string,
+  user: any,
+  useStoredData: boolean = false
+): Promise<PDFGenerationResult> => {
+  try {
+    if (!user?.id) {
+      throw new Error('User authentication required');
+    }
+
+    // Calculate summary data
+    const summaryData = calculateReportSummary(reportData, creditsData);
+
+    // Generate PDF
+    const pdfBlob = await generatePDFBlob(reportData, creditsData, selectedDate, user, useStoredData, summaryData);
+    
+    // Generate file name and path
+    const fileName = `daily-report-${selectedDate}.pdf`;
+    const filePath = `${user.id}/${fileName}`;
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('daily-reports')
+      .upload(filePath, pdfBlob, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+    if (uploadError) {
+      throw new Error(`Failed to upload PDF: ${uploadError.message}`);
+    }
+
+    // Prepare structured data for database storage
+    const structuredReportData = reportData.map(item => ({
+      no: item.no,
+      libelle: item.libelle,
+      stock: item.stock,
+      entres: item.entres,
+      totalJour: item.totalJour,
+      solde: item.solde,
+      sortie: item.sortie,
+      pUnit1: item.pUnit1,
+      pTotal: item.pTotal,
+      amavide: item.amavide,
+      productId: item.productId
+    }));
+
+    const structuredCreditsData = creditsData.map(credit => ({
+      id: credit.id,
+      customer_name: credit.customer_name,
+      amount: credit.amount,
+      product_name: credit.product_name,
+      created_at: credit.created_at
+    }));
+
+    // Save metadata and structured data to database
+    const pdfMetadata = {
+      report_date: selectedDate,
+      pdf_path: filePath,
+      file_name: fileName,
+      file_size: pdfBlob.size,
+      report_data: structuredReportData,
+      credits_data: structuredCreditsData,
+      summary_data: summaryData,
+      created_by: user.id,
+      metadata: {
+        data_source: useStoredData ? 'stored' : 'live',
+        generated_at: new Date().toISOString(),
+        user_name: user.full_name,
+        user_role: user.role
+      }
+    };
+
+    const { data: dbData, error: dbError } = await supabase
+      .from('daily_report_pdfs')
+      .upsert([pdfMetadata])
+      .select()
+      .single();
+
+    if (dbError) {
+      // If database save fails, try to clean up the uploaded file
+      await supabase.storage.from('daily-reports').remove([filePath]);
+      throw new Error(`Failed to save PDF metadata: ${dbError.message}`);
+    }
+
+    return {
+      success: true,
+      pdfPath: filePath,
+      metadata: dbData
+    };
+
+  } catch (error: any) {
+    console.error('Error generating and storing PDF:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to generate and store PDF'
+    };
+  }
+};
+
+/**
+ * Generate PDF blob from report data
+ */
+const generatePDFBlob = async (
+  reportData: DailyReportData[],
+  creditsData: CreditData[],
+  selectedDate: string,
+  user: any,
+  useStoredData: boolean,
+  summaryData: any
+): Promise<Blob> => {
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+  
+  // Header
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BAR LE BON SAMARITAIN', 20, 20);
+  
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text('FICHE D\'EXPLOITATION/CAISSE', 20, 28);
+  
+  doc.setFontSize(10);
+  doc.text(`DATE: ${format(new Date(selectedDate), 'dd/MM/yyyy')}`, 20, 36);
+  doc.text(`Source: ${useStoredData ? 'Stored Database Report' : 'Live Generated Report'}`, 20, 42);
+  doc.text(`Generated by: ${user.full_name} (${user.role})`, 20, 48);
+
+  // Main table using autoTable for better formatting
+  const tableData = reportData.map(item => [
+    item.no.toString(),
+    item.libelle.substring(0, 20),
+    item.stock.toString(),
+    item.entres.toString(),
+    item.totalJour.toString(),
+    item.solde.toString(),
+    item.sortie.toString(),
+    item.pUnit1.toFixed(0),
+    item.pTotal.toFixed(0),
+    item.amavide.toString()
+  ]);
+
+  // Add totals row
+  tableData.push([
+    'TOTAL',
+    '',
+    summaryData.totalStock.toString(),
+    summaryData.totalEntres.toString(),
+    summaryData.totalJour.toString(),
+    summaryData.totalSolde.toString(),
+    summaryData.totalSortie.toString(),
+    '',
+    summaryData.totalPTotal.toFixed(0),
+    summaryData.totalAmavide.toString()
+  ]);
+
+  doc.autoTable({
+    head: [['No', 'LIBELLE', 'Stock', 'Entres', 'Total/Jour', 'Solde', 'Sortie', 'P.Unit 1', 'P.Total', 'Amavide']],
+    body: tableData,
+    startY: 55,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2,
+    },
+    headStyles: {
+      fillColor: [240, 240, 240],
+      textColor: [0, 0, 0],
+      fontStyle: 'bold'
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 12 },
+      1: { halign: 'left', cellWidth: 45 },
+      2: { halign: 'right', cellWidth: 15 },
+      3: { halign: 'right', cellWidth: 15 },
+      4: { halign: 'right', cellWidth: 20 },
+      5: { halign: 'right', cellWidth: 15 },
+      6: { halign: 'right', cellWidth: 15 },
+      7: { halign: 'right', cellWidth: 18 },
+      8: { halign: 'right', cellWidth: 18 },
+      9: { halign: 'right', cellWidth: 15 }
+    },
+    didParseCell: function(data) {
+      // Make the total row bold
+      if (data.row.index === tableData.length - 1) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [250, 250, 250];
+      }
+    }
+  });
+
+  // Credits section
+  if (creditsData.length > 0) {
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('2.(DETTE NOM ET PRENOM + MONTANT)', 20, finalY);
+
+    const creditsTableData = creditsData.map((credit, index) => [
+      (index + 1).toString(),
+      credit.customer_name.substring(0, 25),
+      Number(credit.amount).toFixed(0)
+    ]);
+
+    // Add credits total
+    const totalCreditAmount = creditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
+    creditsTableData.push([
+      'TOTAL',
+      '',
+      totalCreditAmount.toFixed(0)
+    ]);
+
+    doc.autoTable({
+      head: [['No', 'NOM ET PRENOM', 'MONTANT']],
+      body: creditsTableData,
+      startY: finalY + 5,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [240, 240, 240],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 15 },
+        1: { halign: 'left', cellWidth: 60 },
+        2: { halign: 'right', cellWidth: 25 }
+      },
+      didParseCell: function(data) {
+        // Make the total row bold
+        if (data.row.index === creditsTableData.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [250, 250, 250];
+        }
+      }
+    });
+  }
+
+  // Footer
+  const footerY = pageHeight - 30;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 20, footerY);
+  doc.text(`Data source: ${useStoredData ? 'Database Storage' : 'Live Generation'}`, 20, footerY + 5);
+  doc.text('RGBUSS Business Management System', pageWidth - 20, footerY, { align: 'right' });
+
+  return doc.output('blob');
+};
+
+/**
+ * Calculate summary data from report
+ */
+const calculateReportSummary = (reportData: DailyReportData[], creditsData: CreditData[]) => {
+  const totalStock = reportData.reduce((sum, item) => sum + Number(item.stock || 0), 0);
+  const totalEntres = reportData.reduce((sum, item) => sum + Number(item.entres || 0), 0);
+  const totalJour = reportData.reduce((sum, item) => sum + Number(item.totalJour || 0), 0);
+  const totalSolde = reportData.reduce((sum, item) => sum + Number(item.solde || 0), 0);
+  const totalSortie = reportData.reduce((sum, item) => sum + Number(item.sortie || 0), 0);
+  const totalPTotal = reportData.reduce((sum, item) => sum + Number(item.pTotal || 0), 0);
+  const totalAmavide = reportData.reduce((sum, item) => sum + Number(item.amavide || 0), 0);
+  const totalCredits = creditsData.reduce((sum, credit) => sum + Number(credit.amount || 0), 0);
+
+  return {
+    totalStock,
+    totalEntres,
+    totalJour,
+    totalSolde,
+    totalSortie,
+    totalPTotal,
+    totalAmavide,
+    totalCredits,
+    productsCount: reportData.length,
+    creditsCount: creditsData.length
+  };
+};
+
+/**
+ * Retrieve all stored PDF reports
+ */
+export const getStoredPDFReports = async (): Promise<PDFReportMetadata[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('daily_report_pdfs')
+      .select('*')
+      .order('report_date', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch PDF reports: ${error.message}`);
+    }
+
+    return data || [];
+  } catch (error: any) {
+    console.error('Error fetching stored PDF reports:', error);
+    return [];
+  }
+};
+
+/**
+ * Get PDF download URL
+ */
+export const getPDFDownloadURL = async (pdfPath: string): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase.storage
+      .from('daily-reports')
+      .createSignedUrl(pdfPath, 3600); // 1 hour expiry
+
+    if (error) {
+      throw new Error(`Failed to create download URL: ${error.message}`);
+    }
+
+    return data.signedUrl;
+  } catch (error: any) {
+    console.error('Error creating PDF download URL:', error);
+    return null;
+  }
+};
+
+/**
+ * Convert stored PDF data back to table format
+ * This uses the structured data stored in the database, not PDF parsing
+ */
+export const convertPDFToTableData = async (pdfMetadata: PDFReportMetadata): Promise<{
+  reportData: DailyReportData[];
+  creditsData: CreditData[];
+  summaryData: any;
+} | null> => {
+  try {
+    // The structured data is already stored in the database
+    return {
+      reportData: pdfMetadata.report_data || [],
+      creditsData: pdfMetadata.credits_data || [],
+      summaryData: pdfMetadata.summary_data || {}
+    };
+  } catch (error: any) {
+    console.error('Error converting PDF to table data:', error);
+    return null;
+  }
+};
+
+/**
+ * Delete stored PDF and its metadata
+ */
+export const deleteStoredPDF = async (pdfMetadata: PDFReportMetadata): Promise<boolean> => {
+  try {
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('daily-reports')
+      .remove([pdfMetadata.pdf_path]);
+
+    if (storageError) {
+      console.warn('Failed to delete PDF from storage:', storageError.message);
+      // Continue with database deletion even if storage deletion fails
+    }
+
+    // Delete metadata from database
+    const { error: dbError } = await supabase
+      .from('daily_report_pdfs')
+      .delete()
+      .eq('id', pdfMetadata.id);
+
+    if (dbError) {
+      throw new Error(`Failed to delete PDF metadata: ${dbError.message}`);
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Error deleting stored PDF:', error);
+    return false;
+  }
+};
+
+/**
+ * Get PDF report by date
+ */
+export const getPDFReportByDate = async (reportDate: string): Promise<PDFReportMetadata | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('daily_report_pdfs')
+      .select('*')
+      .eq('report_date', reportDate)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No data found
+        return null;
+      }
+      throw new Error(`Failed to fetch PDF report: ${error.message}`);
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching PDF report by date:', error);
+    return null;
+  }
+};
