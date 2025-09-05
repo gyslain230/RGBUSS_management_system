@@ -49,26 +49,17 @@ export const generateAndStoreDailyReportPDF = async (
       throw new Error('User authentication required');
     }
 
-    // Check if bucket exists, if not try to create it
+    // Check if bucket exists
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     
     if (bucketsError) {
-      console.warn('Could not check buckets:', bucketsError.message);
+      throw new Error(`Failed to check storage buckets: ${bucketsError.message}. Please ensure you have proper permissions.`);
     }
     
     const bucketExists = buckets?.some(bucket => bucket.id === 'daily-report-pdfs');
     
     if (!bucketExists) {
-      // Try to create the bucket
-      const { error: createBucketError } = await supabase.storage.createBucket('daily-report-pdfs', {
-        public: false,
-        fileSizeLimit: 10485760, // 10MB
-        allowedMimeTypes: ['application/pdf']
-      });
-      
-      if (createBucketError) {
-        throw new Error(`Storage bucket 'daily-report-pdfs' does not exist and could not be created. Please ensure the migration has been applied to your Supabase database. Error: ${createBucketError.message}`);
-      }
+      throw new Error(`Storage bucket 'daily-report-pdfs' does not exist. Please create the bucket manually in your Supabase dashboard under Storage section, or ensure the migration has been applied to your database.`);
     }
 
     // Generate PDF
