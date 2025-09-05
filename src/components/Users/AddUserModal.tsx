@@ -35,7 +35,7 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
     setError(null);
     
     try {
-      await signUp(data.email, data.password, data.fullName, data.role);
+      const result = await signUp(data.email, data.password, data.fullName, data.role);
       toast.success('User created successfully!');
       reset();
       logSecurityEvent('user_add_success', { email: '[redacted]', role: data.role });
@@ -43,7 +43,17 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
       onClose();
     } catch (error: any) {
       logSecurityEvent('user_add_failure');
-      const errorMessage = error.message || 'Failed to create user';
+      let errorMessage = error.message || 'Failed to create user';
+      
+      // Provide more user-friendly error messages
+      if (errorMessage.includes('User already registered')) {
+        errorMessage = 'A user with this email address already exists';
+      } else if (errorMessage.includes('Invalid email')) {
+        errorMessage = 'Please enter a valid email address';
+      } else if (errorMessage.includes('Password')) {
+        errorMessage = 'Password must be at least 8 characters with uppercase, lowercase, and numbers';
+      }
+      
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

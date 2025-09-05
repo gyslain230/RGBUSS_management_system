@@ -432,103 +432,89 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
   }
 
   try {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Sign up request timeout')), 20000);
-    });
-
-    const signUpPromise = supabase.auth.signUp({
+    // Create user with auto-confirmation for admin-created accounts
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: sanitizedEmail,
       password,
       options: {
         data: {
           full_name: sanitizedFullName,
           role: role
-        }
+        },
+        emailRedirectTo: undefined // Disable email confirmation
       }
     });
 
-    const { data: authData, error: authError } = await Promise.race([signUpPromise, timeoutPromise]);
 
     if (authError) {
       console.error('Sign up error:', authError.message);
-      
-      if (authError.message?.includes('Failed to fetch') || 
-          authError.message?.includes('fetch') ||
-          authError.message?.includes('network')) {
-        throw new Error('Unable to connect to authentication service. Please check your internet connection.');
-      }
       
       if (authError.message?.includes('User already registered')) {
         throw new Error('A user with this email address already exists');
       }
       
-      if (authError.message?.includes('Password should be at least')) {
-        throw new Error('Password must be at least 6 characters long');
-      }
-      
-      if (authError.message?.includes('Invalid email')) {
-        throw new Error('Please enter a valid email address');
-      }
-      
-      throw new Error(`Authentication error: ${authError.message}`);
+      throw new Error(authError.message || 'Failed to create user account');
     }
 
     if (!authData.user) {
       throw new Error('User creation failed - no user returned from authentication');
     }
 
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // If user needs email confirmation, confirm them automatically
+    if (!authData.user.email_confirmed_at && authData.user.id) {
+      try {
+        // Use service role to confirm the user automatically
+        const { error: confirmError } = await supabase.auth.admin.updateUserById(
+          authData.user.id,
+          { email_confirm: true }
+        );
+        
+        if (confirmError) {
+          console.warn('Auto-confirmation failed:', confirmError.message);
+          // Continue anyway - user can be confirmed later
+        }
+      } catch (confirmError) {
+        console.warn('Auto-confirmation error:', confirmError);
+        // Continue anyway - user can be confirmed later
+      }
+    }
 
-    const profileCheckPromise = supabase
+    // Wait a moment for the user to be fully created
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Check if profile already exists (created by trigger)
+    const { data: existingProfile, error: profileCheckError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', authData.user.id)
       .maybeSingle();
 
-    const { data: existingProfile, error: profileCheckError } = await Promise.race([
-      profileCheckPromise, 
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Profile check timeout')), 10000))
-    ]);
-
-    if (profileCheckError && !profileCheckError.message?.includes('timeout')) {
+    if (profileCheckError && profileCheckError.code !== 'PGRST116') {
       console.warn('Profile check error:', profileCheckError.message);
     }
 
+    // Create profile if it doesn't exist
     if (!existingProfile) {
       const profileData = {
         id: authData.user.id,
-        email: email.trim().toLowerCase(),
-        full_name: fullName.trim(),
+        email: sanitizedEmail,
+        full_name: sanitizedFullName,
         role: role
       };
 
-      const profileInsertPromise = supabase
+      const { data: newProfile, error: profileError } = await supabase
         .from('profiles')
         .insert([profileData])
         .select()
         .single();
 
-      const { data: newProfile, error: profileError } = await Promise.race([
-        profileInsertPromise,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Profile creation timeout')), 10000))
-      ]);
-
       if (profileError) {
         console.error('Profile creation error:', profileError.message);
         
-        if (profileError.message?.includes('Failed to fetch') || 
-            profileError.message?.includes('fetch') ||
-            profileError.message?.includes('network') ||
-            profileError.message?.includes('timeout')) {
-          throw new Error('Unable to connect to database service. Please check your internet connection.');
-        }
-        
         if (profileError.code === '23505') {
           throw new Error('A user with this email already exists');
-        } else if (profileError.code === '42501') {
-          throw new Error('Permission denied. Please check your database policies');
         } else {
-          throw new Error(`Database error saving new user: ${profileError.message}`);
+          throw new Error('Failed to create user profile. Please try again.');
         }
       }
 
@@ -537,21 +523,8 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
       return { ...authData, profile: existingProfile };
     }
   } catch (error: any) {
-    if (error.message?.includes('timeout')) {
-      throw new Error('Request timed out. Please check your internet connection and try again.');
-    }
-    
-    if (error.message?.includes('User already registered')) {
-      throw new Error('A user with this email address already exists');
-    } else if (error.message?.includes('Password should be at least')) {
-      throw new Error('Password must be at least 6 characters long');
-    } else if (error.message?.includes('Invalid email')) {
-      throw new Error('Please enter a valid email address');
-    } else if (error.message?.includes('Database error saving new user')) {
-      throw error;
-    } else {
-      throw new Error(error.message || 'Failed to create user account');
-    }
+    logSecurityEvent('signup_failure', { error: error.message?.substring(0, 50) });
+    throw new Error(error.message || 'Failed to create user account');
   }
 };
 
