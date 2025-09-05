@@ -50,8 +50,8 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
   };
 
   const onSubmit = async (data: UserFormData) => {
-    // Check if we can add this role
-    const canAdd = await canAddUserWithRole(data.role);
+    // Check if we can add this role using available roles
+    const canAdd = availableRoles.includes(data.role);
     if (!canAdd) {
       setError(`Cannot add ${data.role}: role already exists or maximum users (3) reached`);
       return;
