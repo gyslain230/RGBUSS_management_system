@@ -23,9 +23,20 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const users = await getUsers();
-      setUsers(users);
+      // Clear cache to ensure fresh data
+      clearCache('users');
+      
+      // Fetch users directly from database instead of using cached function
+      const { data: users, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role, created_at')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setUsers(users || []);
     } catch (error) {
+      console.error('Error loading users:', error);
       toast.error('Error loading users');
     } finally {
       setLoading(false);
@@ -61,9 +72,11 @@ const UserManagement = () => {
 
       toast.success('User deleted successfully');
       clearCache('users');
+      clearCache(); // Clear all cache
       fetchUsers();
       fetchSystemStatus();
     } catch (error) {
+      console.error('Error deleting user:', error);
       toast.error('Error deleting user');
     }
   };
@@ -86,9 +99,11 @@ const UserManagement = () => {
 
       toast.success('User role updated successfully');
       clearCache('users');
+      clearCache(); // Clear all cache
       fetchUsers();
       fetchSystemStatus();
     } catch (error) {
+      console.error('Error updating user role:', error);
       toast.error('Error updating user role');
     }
   };

@@ -259,16 +259,14 @@ export const getUsers = async () => {
     return [];
   }
 
-  const cacheKey = 'users';
-  return await getCachedData(cacheKey, async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, role, created_at')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  });
+  // Don't use cache for users to ensure real-time updates
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name, role, created_at')
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
 };
 
 // Get system users status (total users, missing roles, etc.)

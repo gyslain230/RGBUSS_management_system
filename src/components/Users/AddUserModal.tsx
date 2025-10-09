@@ -65,6 +65,10 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
       toast.success('User created successfully!');
       reset();
       logSecurityEvent('user_add_success', { email: '[redacted]', role: data.role });
+      
+      // Clear all caches to ensure fresh data
+      clearCache();
+      
       onSuccess();
       onClose();
     } catch (error: any) {
