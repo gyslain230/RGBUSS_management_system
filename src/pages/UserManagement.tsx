@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Trash2, Shield, Mail } from 'lucide-react';
+import { Users, Plus, Trash2, Shield, Mail, RefreshCw } from 'lucide-react';
 import { getUsers, clearCache, supabase, getSystemUsersStatus, User } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -25,19 +25,22 @@ const UserManagement = () => {
     try {
       // Clear cache to ensure fresh data
       clearCache('users');
+      clearCache(); // Clear all cache
       
-      // Fetch users directly from database instead of using cached function
-      const { data: users, error } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, created_at')
-        .order('created_at', { ascending: false });
+      console.log('Fetching users from database...');
       
-      if (error) throw error;
+      // Use the existing getUsers function
+      const users = await getUsers();
       
+      console.log('Fetched users:', users);
+      console.log('Number of users found:', users?.length || 0);
+
       setUsers(users || []);
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error('Error loading users');
+      // Set empty array on error to prevent showing stale data
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -168,6 +171,17 @@ const UserManagement = () => {
         {activeTab === 'users' && (
           <div className="flex justify-end">
             <button
+              onClick={() => {
+                console.log('Manual refresh clicked');
+                setLoading(true);
+                fetchUsers();
+              }}
+              className="inline-flex items-center px-4 py-2 mr-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Users
+            </button>
+            <button
               onClick={() => setShowAddModal(true)}
               disabled={systemStatus?.remaining_slots === 0}
               className="inline-flex items-center px-4 py-2 lg:px-6 lg:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
@@ -258,7 +272,22 @@ const UserManagement = () => {
 
         {users.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-            No users found
+            <div>
+              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p>No users found</p>
+              <p className="text-sm mt-2">
+                {loading ? 'Loading...' : 'Click "Refresh Users" to reload data'}
+              </p>
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  fetchUsers();
+                }}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Refresh Users
+              </button>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
