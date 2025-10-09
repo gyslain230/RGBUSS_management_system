@@ -6,7 +6,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import AuthGuard from './components/AuthGuard';
 import SessionManager from './components/SessionManager';
 import LoginForm from './components/Auth/LoginForm';
-import RegisterForm from './components/Auth/RegisterForm';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import StockManagement from './pages/StockManagement';
@@ -56,14 +55,6 @@ function App() {
                 element={
                   <AuthGuard requireAuth={false} redirectTo="/dashboard">
                     <LoginForm />
-                  </AuthGuard>
-                } 
-              />
-              <Route 
-                path="/register" 
-                element={
-                  <AuthGuard requireAuth={false} redirectTo="/dashboard">
-                    <RegisterForm />
                   </AuthGuard>
                 } 
               />

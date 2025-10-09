@@ -200,17 +200,6 @@ export default function LoginForm() {
             </button>
           </div>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Need an account?{" "}
-              <Link
-                to="/register"
-                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors duration-200"
-              >
-                Create one here
-              </Link>
-            </p>
-          </div>
         </form>
 
         {/* Loading Status */}
@@ -257,16 +246,6 @@ export default function LoginForm() {
           </div>
         )}
 
-        {isSupabaseReady() && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-            <div className="text-sm text-green-700 dark:text-green-300">
-              <p className="font-medium mb-1">🔧 For Testing</p>
-              <p className="text-xs">
-                Create an account using the Register page, then sign in here.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
