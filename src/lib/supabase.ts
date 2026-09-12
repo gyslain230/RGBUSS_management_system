@@ -285,13 +285,30 @@ export const getSystemUsersStatus = async () => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('system_users_status')
-      .select('*')
-      .single();
+    const { data: users, error } = await supabase
+      .from('profiles')
+      .select('role');
 
     if (error) throw error;
-    return data;
+
+    const adminCount = users.filter((u) => u.role === 'admin').length;
+    const managerCount = users.filter((u) => u.role === 'manager').length;
+    const workerCount = users.filter((u) => u.role === 'worker').length;
+    const total = users.length;
+
+    const missingRoles: string[] = [];
+    if (adminCount === 0) missingRoles.push('admin');
+    if (managerCount === 0) missingRoles.push('manager');
+    if (workerCount === 0) missingRoles.push('worker');
+
+    return {
+      total_users: total,
+      admin_count: adminCount,
+      manager_count: managerCount,
+      worker_count: workerCount,
+      remaining_slots: Math.max(0, 3 - total),
+      missing_roles: missingRoles
+    };
   } catch (error) {
     console.error('Error fetching system users status:', error);
     return {
